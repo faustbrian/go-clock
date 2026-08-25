@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	clock "github.com/faustbrian/golib/pkg/clock"
+	clock "github.com/faustbrian/go-clock"
 )
 
 func TestSystemNowPreservesLocalTimeAndMonotonicReading(t *testing.T) {

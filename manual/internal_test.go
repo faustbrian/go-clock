@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	clockpkg "github.com/faustbrian/golib/pkg/clock"
+	clockpkg "github.com/faustbrian/go-clock"
 )
 
 func TestInternalEventHeapUsesStrictDeadlineAndSequenceOrder(t *testing.T) {

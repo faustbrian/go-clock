@@ -1,3 +1,3 @@
-module github.com/faustbrian/golib/pkg/clock
+module github.com/faustbrian/go-clock
 
 go 1.26.6

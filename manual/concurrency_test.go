@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/faustbrian/golib/pkg/clock/manual"
+	"github.com/faustbrian/go-clock/manual"
 )
 
 func TestConcurrentAdvanceResetStopWaitCallbackCancelAndShutdown(t *testing.T) {

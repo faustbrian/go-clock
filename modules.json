@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-clock",
+  "go_version": "1.26.6",
+  "modules": [
+    {
+      "directory": ".",
+      "module_path": "github.com/faustbrian/go-clock",
+      "go_version": "1.26.6",
+      "packages": [
+        {
+          "module_directory": ".",
+          "directory": ".",
+          "name": "clock",
+          "import_path": "github.com/faustbrian/go-clock",
+          "kind": "public",
+          "production": true,
+          "executable": true,
+          "coverage_required": true,
+          "build_required": true,
+          "build_tags": []
+        },
+        {
+          "module_directory": ".",
+          "directory": "clocktest",
+          "name": "clocktest",
+          "import_path": "github.com/faustbrian/go-clock/clocktest",
+          "kind": "test support",
+          "production": false,
+          "executable": true,
+          "coverage_required": false,
+          "build_required": true,
+          "build_tags": []
+        },
+        {
+          "module_directory": ".",
+          "directory": "manual",
+          "name": "manual",
+          "import_path": "github.com/faustbrian/go-clock/manual",
+          "kind": "public",
+          "production": true,
+          "executable": true,
+          "coverage_required": true,
+          "build_required": true,
+          "build_tags": []
+        }
+      ],
+      "purpose": "`clock` is a small, production-oriented clock foundation for Go 1.26 and later. It keeps `time.Time` and `time.Duration` as public values, separates wall time from elapsed time, and provides deterministic timers, tickers, sleeps, and callbacks without changing the process-wide clock.",
+      "lifecycle": "stable",
+      "kind": "public library",
+      "releasable": true,
+      "family": "foundations",
+      "family_label": "Foundations",
+      "family_description": "Common immutable values, deterministic seams, configuration, identity propagation, and input validation.",
+      "family_order": 1,
+      "version": "v1.0.0",
+      "tag_prefix": "v",
+      "owned_dependencies": [],
+      "reverse_owned_dependencies": [
+        "github.com/faustbrian/go-authentication",
+        "github.com/faustbrian/go-authentication/authotel",
+        "github.com/faustbrian/go-authentication/jwt",
+        "github.com/faustbrian/go-authentication/oidc",
+        "github.com/faustbrian/go-authorization/integration/contracts",
+        "github.com/faustbrian/go-http-middleware/integration/siblings",
+        "github.com/faustbrian/go-idempotency",
+        "github.com/faustbrian/go-idempotency/compatibility/ecosystem",
+        "github.com/faustbrian/go-opening-hours",
+        "github.com/faustbrian/go-queue-control-plane",
+        "github.com/faustbrian/go-scheduler",
+        "github.com/faustbrian/go-service/compatibility",
+        "github.com/faustbrian/go-service/integration/reference-http"
+      ],
+      "external_runtime_dependencies": [],
+      "required_services": [],
+      "build_tags": [],
+      "test_tags": [],
+      "interoperability_tools": [],
+      "specifications": [],
+      "conformance_corpora": [],
+      "provenance": [],
+      "goal_files": [
+        ".ai/GOAL.md",
+        ".ai/GOAL_HARDEN.md"
+      ],
+      "goal_status": "implementation-evidence-inventoried",
+      "goal_evidence": [
+        {
+          "file": ".ai/GOAL.md",
+          "requirements_sha256": "694500d9fb1af5122e5ecf427b94614686c3e2dd96a6201303edf3fef7f782c0",
+          "implementation_evidence": [
+            "CHANGELOG.md",
+            "README.md",
+            "docs/api.md",
+            "docs/compatibility.md",
+            "docs/hardening.md",
+            "docs/performance.md"
+          ],
+          "verification_gates": [
+            "format-check",
+            "tidy-check",
+            "safety",
+            "vet",
+            "test",
+            "race",
+            "coverage",
+            "lint",
+            "staticcheck",
+            "vulnerability",
+            "secrets",
+            "licenses",
+            "sbom",
+            "fuzz",
+            "mutation",
+            "nilaway",
+            "docs",
+            "api",
+            "conformance",
+            "interoperability",
+            "benchmark"
+          ],
+          "implementation_status": "implemented-requires-fresh-verification"
+        },
+        {
+          "file": ".ai/GOAL_HARDEN.md",
+          "requirements_sha256": "9e549e65b398f03b195395ebbb1ed753a5f3519d3229ef43feeac3d39c9566a2",
+          "implementation_evidence": [
+            "CHANGELOG.md",
+            "README.md",
+            "docs/api.md",
+            "docs/compatibility.md",
+            "docs/hardening.md",
+            "docs/performance.md"
+          ],
+          "verification_gates": [
+            "format-check",
+            "tidy-check",
+            "safety",
+            "vet",
+            "test",
+            "race",
+            "coverage",
+            "lint",
+            "staticcheck",
+            "vulnerability",
+            "secrets",
+            "licenses",
+            "sbom",
+            "fuzz",
+            "mutation",
+            "nilaway",
+            "docs",
+            "api",
+            "conformance",
+            "interoperability",
+            "benchmark"
+          ],
+          "implementation_status": "implemented-requires-fresh-verification"
+        }
+      ],
+      "gates": {
+        "api_compatibility": true,
+        "benchmarks": true,
+        "conformance": false,
+        "coverage": true,
+        "documentation": true,
+        "fuzz": true,
+        "lint": true,
+        "mutation": true,
+        "race": true,
+        "security": true,
+        "tests": true
+      }
+    }
+  ]
+}

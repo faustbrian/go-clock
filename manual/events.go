@@ -5,7 +5,7 @@ import (
 	"container/heap"
 	"time"
 
-	clockpkg "github.com/faustbrian/golib/pkg/clock"
+	clockpkg "github.com/faustbrian/go-clock"
 )
 
 type eventState struct {

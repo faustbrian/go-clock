@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	clockpkg "github.com/faustbrian/golib/pkg/clock"
+	clockpkg "github.com/faustbrian/go-clock"
 )
 
 var (

@@ -3,7 +3,7 @@ package manual
 import (
 	"time"
 
-	clockpkg "github.com/faustbrian/golib/pkg/clock"
+	clockpkg "github.com/faustbrian/go-clock"
 )
 
 // Timer is a manually advanced one-shot timer.

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-clock",
+  "packages": [
+    {
+      "module_directory": ".",
+      "directory": ".",
+      "name": "clock",
+      "import_path": "github.com/faustbrian/go-clock",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "clocktest",
+      "name": "clocktest",
+      "import_path": "github.com/faustbrian/go-clock/clocktest",
+      "kind": "test support",
+      "production": false,
+      "executable": true,
+      "coverage_required": false,
+      "build_required": true,
+      "build_tags": []
+    },
+    {
+      "module_directory": ".",
+      "directory": "manual",
+      "name": "manual",
+      "import_path": "github.com/faustbrian/go-clock/manual",
+      "kind": "public",
+      "production": true,
+      "executable": true,
+      "coverage_required": true,
+      "build_required": true,
+      "build_tags": []
+    }
+  ]
+}

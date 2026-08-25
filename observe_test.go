@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	clock "github.com/faustbrian/golib/pkg/clock"
-	"github.com/faustbrian/golib/pkg/clock/manual"
+	clock "github.com/faustbrian/go-clock"
+	"github.com/faustbrian/go-clock/manual"
 )
 
 func TestObservedClockReportsBoundedLifecycleData(t *testing.T) {

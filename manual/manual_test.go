@@ -8,8 +8,8 @@ import (
 	"testing/synctest"
 	"time"
 
-	clock "github.com/faustbrian/golib/pkg/clock"
-	"github.com/faustbrian/golib/pkg/clock/manual"
+	clock "github.com/faustbrian/go-clock"
+	"github.com/faustbrian/go-clock/manual"
 )
 
 var epoch = time.Date(2026, time.January, 2, 3, 4, 5, 0, time.FixedZone("test", 7200))

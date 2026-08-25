@@ -1,4 +1,4 @@
-package clock // import "github.com/faustbrian/golib/pkg/clock"
+package clock // import "github.com/faustbrian/go-clock"
 
 Package clock provides narrow time capabilities backed by the standard library
 and deterministic implementations for tests.
@@ -213,7 +213,7 @@ type TimerFactory interface {
 }
     TimerFactory creates owned one-shot timers.
 
-package manual // import "github.com/faustbrian/golib/pkg/clock/manual"
+package manual // import "github.com/faustbrian/go-clock/manual"
 
 Package manual provides deterministic fixed and manually advanced clocks.
 
@@ -391,7 +391,7 @@ type Waiter struct {
 func (waiter *Waiter) Wait(ctx context.Context) (Result, error)
     Wait returns the completed result or context cancellation.
 
-package clocktest // import "github.com/faustbrian/golib/pkg/clock/clocktest"
+package clocktest // import "github.com/faustbrian/go-clock/clocktest"
 
 Package clocktest contains deterministic testing helpers for clock.
 
