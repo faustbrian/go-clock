@@ -78,7 +78,7 @@ vuln:
 	$(TOOLS_DIR)/govulncheck ./...
 
 mutation:
-	$$(git rev-parse --show-toplevel)/scripts/check-mutation.sh .
+	$$(git rev-parse --show-toplevel)/.golib/scripts/check-mutation.sh .
 
 workflows:
 	$(TOOLS_DIR)/actionlint .github/workflows/*.yml
