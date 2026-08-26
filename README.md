@@ -126,7 +126,7 @@ that meets their contract.
 - [Compatibility](docs/compatibility.md)
 - [Security model](docs/security-model.md)
 - [Performance](docs/performance.md)
-- [Hardening evidence](docs/hardening.md)
+- [Verification](docs/verification.md)
 - [FAQ](docs/faq.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Contributing](CONTRIBUTING.md)
@@ -154,8 +154,3 @@ concerns.
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-## Ecosystem
-
-Use the [Golib documentation portal](https://github.com/faustbrian/golib/blob/main/docs/index.md)
-to choose companion packages, supported stacks, recipes, and operations guidance.

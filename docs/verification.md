@@ -1,4 +1,4 @@
-# Hardening evidence
+# Verification
 
 The maintained local gate is:
 
