@@ -35,7 +35,7 @@ the module follows semantic versioning.
   monorepo-canonical targets and current release guidance.
 - Document the package's initial stable `v1.0.0` scope and security policy.
 
-- Link the package README to the repository-wide Golib documentation portal.
+- Link the package README to package-owned documentation.
 
 ### Changed
 
