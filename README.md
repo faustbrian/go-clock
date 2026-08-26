@@ -116,33 +116,13 @@ that meets their contract.
 
 ## Documentation
 
-- [API and ownership](docs/api.md)
-- [State machines and ordering](docs/state-machines.md)
-- [Deterministic concurrency](docs/concurrency.md)
-- [Wall and monotonic time](docs/wall-and-monotonic.md)
-- [`testing/synctest`](docs/synctest.md)
-- [Observations](docs/observations.md)
-- [Integration and migration](docs/integration.md)
-- [Compatibility](docs/compatibility.md)
-- [Security model](docs/security-model.md)
-- [Performance](docs/performance.md)
-- [Verification](docs/verification.md)
-- [FAQ](docs/faq.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Contributing](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
-- [Changelog](CHANGELOG.md)
+Use the [documentation index](docs/README.md) for API ownership, deterministic
+concurrency, wall and monotonic time, integration, security, and verification.
 
-## Local release gates
+## Development
 
-```sh
-make install-tools
-make check staticcheck lint nilaway vuln benchmark mutation
-```
-
-The exact commands are implemented by the Makefile. Production statement
-coverage is required to be 100.0% for the root and `manual` packages. The
-`clocktest` package is test infrastructure and is exercised separately.
+Run `make check`. See [CONTRIBUTING.md](CONTRIBUTING.md) for focused and release
+verification.
 
 ## Scope
 
