@@ -5,6 +5,11 @@ the module follows semantic versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Adopt the versioned shared `golib` repository contract for local and hosted
+  verification while retaining package-owned API and mutation evidence.
+
 ### Documentation
 
 - Replace archived monorepo and hardening terminology with package-owned

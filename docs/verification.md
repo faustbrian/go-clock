@@ -1,10 +1,9 @@
 # Verification
 
-The maintained local gate is:
+Install the `golib` release declared by `.golib.yaml`, then run:
 
 ```sh
-make install-tools
-make check staticcheck lint nilaway vuln benchmark mutation
+golib check --all
 ```
 
 It covers formatting, module tidiness, vet, unit/state-machine tests, 100.0%
@@ -13,7 +12,7 @@ forbidden-runtime scans, documentation examples, API compatibility, workflow
 validation, Staticcheck, strict golangci-lint, advisory NilAway, govulncheck,
 benchmarks, and mutation testing.
 
-`make mutation` now delegates to the canonical content-addressed repository
+`golib mutation --module .` uses the canonical content-addressed repository
 runner. It requires exact 100% efficacy and mutant coverage, with every viable
 mutant killed. Survivors, timeouts, uncovered mutants, malformed reports,
 missing packages, and unclassified results fail closed. Earlier standalone
@@ -48,11 +47,11 @@ and cold/contended benchmark baselines.
 | Go standard-library alignment | `TestSystemTimerAndCallbackDifferentialAgainstTime`; system lifecycle and invalid-input tests; `docs/compatibility.md` |
 | Ordering and callback reentrancy | `TestAdvanceFiresEventsByTimestampThenRegistration`; nested waiter association tests; `TestCallbackCanStopAndResetAdditionalClockWork`; callback create/wait tests |
 | Waiter quiescence and recursion limits | `TestInternalNestedWaiterIncludesLaterSameInstantCallback`; request-relative result tests; work-limit fan-out tests |
-| Concurrency, panic, shutdown, and leaks | repeated `make stress`; full `make race`; callback panic tests; repeated leak target; internal heap-release tests |
+| Concurrency, panic, shutdown, and leaks | typed stress and leak operations in `.golib.yaml`; race gate; callback panic tests; internal heap-release tests |
 | Wall, monotonic, persistence, and synctest | independent jump tests; JSON round-trip test; `clocktest` bubble suites; semantic guide and compatibility matrix |
 | Resource and observation budgets | active/waiter/work-limit tests; tag boundary tests; bounded observation type; security scan |
-| Fuzz, mutation, compatibility, and performance | `make fuzz mutation api benchmark`; canonical repository evidence; `docs/performance.md` |
-| Release automation and advisory analysis | `make workflows`; blocking CI/release workflows; visible non-blocking `make nilaway` |
+| Fuzz, mutation, compatibility, and performance | `golib check --module .`; canonical repository evidence; `docs/performance.md` |
+| Release automation and advisory analysis | Pinned shared CI workflow; visible advisory NilAway output |
 
 The test names above are stable executable contracts, not line-coverage
 proxies. The release command reruns them with race detection, fuzz seeds,

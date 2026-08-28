@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "github.com/faustbrian/go-clock",
+  "module": ".",
+  "package": "manual",
+  "gate": "mutation",
+  "input_digest": "sha256:f675a4b8c2bc9734eabd954f06d62637d5ef800bc79bc97af31270997f80f83c",
+  "verifier_digest": "sha256:9a9499ff68a8dfd49a0be7995590297a8ee563a1aa226bfd8b9361dc53058108",
+  "result": "passed",
+  "report_digest": "sha256:e3cae3a57268c0db0b1f0a6988f248d8da703d1fa80c0530a9daf832e0727019",
+  "environment": {
+    "CGO_ENABLED": "1",
+    "GOARCH": "arm64",
+    "GOOS": "darwin",
+    "GOVERSION": "go1.27.0",
+    "evidence_origin": "approved_legacy_checkpoint"
+  },
+  "completed_at": "2026-08-28T15:03:32.329021Z"
+}

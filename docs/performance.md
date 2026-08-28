@@ -16,7 +16,7 @@ The 2026-07-16 Apple M4 Max cold baseline (`-benchtime=1x`) measured:
 | Manual fan-out, 10,000 timers | 1.90 ms | 40,026 |
 
 Absolute numbers vary by toolchain and hardware. Compare changes on the same
-machine with `make benchmark`; prioritize scaling shape, allocations, and
+machine with `golib check --module .`; prioritize scaling shape, allocations, and
 regressions over cross-machine nanoseconds.
 
 The 2026-07-17 Apple M4 Max cold/contended baseline used five 3-second
