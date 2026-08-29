@@ -12,8 +12,8 @@
     "CGO_ENABLED": "1",
     "GOARCH": "arm64",
     "GOOS": "darwin",
-    "GOVERSION": "go1.27.0",
+    "GOVERSION": "go1.26.6",
     "evidence_origin": "approved_legacy_checkpoint"
   },
-  "completed_at": "2026-08-28T15:03:32.09692Z"
+  "completed_at": "2026-08-29T01:09:03.427394Z"
 }
