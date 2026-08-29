@@ -5,6 +5,16 @@ the module follows semantic versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Adopt the versioned shared `golib` repository contract for local and hosted
+  verification while retaining package-owned API and mutation evidence.
+
+### Documentation
+
+- Replace archived monorepo and hardening terminology with package-owned
+  documentation and reproducible verification guidance.
+
 ## [1.0.0] - 2026-08-25
 
 ### Changed
@@ -30,7 +40,7 @@ the module follows semantic versioning.
   monorepo-canonical targets and current release guidance.
 - Document the package's initial stable `v1.0.0` scope and security policy.
 
-- Link the package README to the repository-wide Golib documentation portal.
+- Link the package README to package-owned documentation.
 
 ### Changed
 
