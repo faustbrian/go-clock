@@ -118,11 +118,15 @@ that meets their contract.
 
 Use the [documentation index](docs/README.md) for API ownership, deterministic
 concurrency, wall and monotonic time, integration, security, and verification.
+Use the versioned
+[Golib ecosystem catalog](https://github.com/faustbrian/go-library-tools/blob/v1.3.0/docs/ecosystem/README.md)
+to compare this module with related foundations and composition packages.
 
 ## Development
 
-Run `make check`. See [CONTRIBUTING.md](CONTRIBUTING.md) for focused and release
-verification.
+Run `make cohesion` for the repository's design-language contract and
+`make check` for its package gates. See [CONTRIBUTING.md](CONTRIBUTING.md) for
+focused and release verification.
 
 ## Scope
 

@@ -7,6 +7,9 @@ the module follows semantic versioning.
 
 ### Changed
 
+- Publish the module's ecosystem family, API, lifecycle, ownership,
+  compatibility, documentation, and delivery metadata, and enforce the
+  cohesion contract locally and in hosted CI.
 - Adopt the versioned shared `golib` repository contract for local and hosted
   verification while retaining package-owned API and mutation evidence.
 
