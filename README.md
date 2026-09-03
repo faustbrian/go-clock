@@ -119,7 +119,8 @@ that meets their contract.
 Use the [documentation index](docs/README.md) for API ownership, deterministic
 concurrency, wall and monotonic time, integration, security, and verification.
 Use the versioned
-[Golib ecosystem catalog](https://github.com/faustbrian/go-library-tools/blob/v1.3.0/docs/ecosystem/README.md)
+[Golib ecosystem catalog](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/README.md)
+and its [Foundations family guidance](https://github.com/faustbrian/go-library-tools/blob/v1.4.0/docs/ecosystem/design-language.md#package-families-and-selection)
 to compare this module with related foundations and composition packages.
 
 ## Development
