@@ -7,6 +7,8 @@ the module follows semantic versioning.
 
 ### Changed
 
+- Adopt the checksum-verified `go-library-tools` v1.4.0 CLI and immutable W14
+  workflow while retaining the schema-v2 cohesion contract and package behavior.
 - Publish the module's ecosystem family, API, lifecycle, ownership,
   compatibility, documentation, and delivery metadata, and enforce the
   cohesion contract locally and in hosted CI.
@@ -15,6 +17,7 @@ the module follows semantic versioning.
 
 ### Documentation
 
+- Link ecosystem guidance to the immutable v1.4.0 documentation release.
 - Replace archived monorepo and hardening terminology with package-owned
   documentation and reproducible verification guidance.
 
