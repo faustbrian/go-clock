@@ -50,6 +50,7 @@ and cold/contended benchmark baselines.
 | Concurrency, panic, shutdown, and leaks | typed stress and leak operations in `.golib.yaml`; race gate; callback panic tests; internal heap-release tests |
 | Wall, monotonic, persistence, and synctest | independent jump tests; JSON round-trip test; `clocktest` bubble suites; semantic guide and compatibility matrix |
 | Resource and observation budgets | active/waiter/work-limit tests; tag boundary tests; bounded observation type; security scan |
+| Release and observation transitions | Close/Shutdown release and concurrency tests; observed sleep, ticker, and callback transition tests |
 | Fuzz, mutation, compatibility, and performance | `golib check --module .`; canonical repository evidence; `docs/performance.md` |
 | Release automation and advisory analysis | Pinned shared CI workflow; visible advisory NilAway output |
 

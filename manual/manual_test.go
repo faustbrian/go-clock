@@ -1063,6 +1063,57 @@ func TestShutdownReleasesOwnedWork(t *testing.T) {
 	}
 }
 
+func TestCloseReleasesOwnedWorkAndShutdownDelegates(t *testing.T) {
+	t.Parallel()
+
+	c := newClock(t)
+	timer, _ := c.NewTimer(time.Hour)
+	ticker, _ := c.NewTicker(time.Hour)
+	callback, _ := c.AfterFunc(time.Hour, func() {})
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Shutdown(); err != nil {
+		t.Fatal(err)
+	}
+	if timer.Stop() || callback.Stop() {
+		t.Fatal("close left active one-shot work")
+	}
+	ticker.Stop()
+	if snapshot := c.Snapshot(); !snapshot.Closed || snapshot.Active != 0 {
+		t.Fatalf("snapshot = %+v", snapshot)
+	}
+}
+
+func TestClosedSleepRejectsBeforeContextOrDurationPreconditions(t *testing.T) {
+	t.Parallel()
+
+	c := newClock(t)
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, test := range []struct {
+		name     string
+		ctx      context.Context
+		duration time.Duration
+	}{
+		{name: "canceled context", ctx: canceled, duration: time.Hour},
+		{name: "zero duration", ctx: context.Background(), duration: 0},
+		{name: "negative duration", ctx: context.Background(), duration: -time.Second},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if err := c.Sleep(test.ctx, test.duration); !errors.Is(err, manual.ErrClosed) {
+				t.Fatalf("Sleep() error = %v, want ErrClosed", err)
+			}
+		})
+	}
+}
+
 func TestShutdownEmptyClock(t *testing.T) {
 	t.Parallel()
 

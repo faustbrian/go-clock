@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"sync"
 	"time"
 )
 
@@ -47,6 +48,10 @@ const (
 	OutcomeCompleted Outcome = "completed"
 	// OutcomeCanceled reports context cancellation.
 	OutcomeCanceled Outcome = "canceled"
+	// OutcomeDeadline reports context deadline expiration.
+	OutcomeDeadline Outcome = "deadline"
+	// OutcomeFailed reports another synchronous operation failure.
+	OutcomeFailed Outcome = "failed"
 	// OutcomeStopped reports a successful active-to-stopped transition.
 	OutcomeStopped Outcome = "stopped"
 	// OutcomeInactive reports an operation on an inactive resource.
@@ -148,9 +153,16 @@ func (clock *observedClock) Measure() func() time.Duration { return clock.base.M
 func (clock *observedClock) Sleep(ctx context.Context, duration time.Duration) error {
 	elapsed := clock.base.Measure()
 	err := clock.base.Sleep(ctx, duration)
-	outcome := OutcomeCompleted
-	if err != nil {
+	var outcome Outcome
+	switch {
+	case err == nil:
+		outcome = OutcomeCompleted
+	case errors.Is(err, context.DeadlineExceeded):
+		outcome = OutcomeDeadline
+	case errors.Is(err, context.Canceled):
 		outcome = OutcomeCanceled
+	default:
+		outcome = OutcomeFailed
 	}
 	clock.report(Observation{Kind: KindSleep, Outcome: outcome, Requested: duration, Elapsed: elapsed()})
 	return err
@@ -173,7 +185,7 @@ func (clock *observedClock) NewTicker(duration time.Duration) (Ticker, error) {
 		return nil, err
 	}
 	clock.report(Observation{Kind: KindTicker, Outcome: OutcomeCreated, Requested: duration})
-	return &observedTicker{Ticker: ticker, clock: clock}, nil
+	return &observedTicker{Ticker: ticker, clock: clock, active: true}, nil
 }
 
 func (clock *observedClock) AfterFunc(duration time.Duration, function func()) (Callback, error) {
@@ -243,20 +255,33 @@ func (timer *observedTimer) Reset(duration time.Duration) (bool, error) {
 
 type observedTicker struct {
 	Ticker
-	clock *observedClock
+	clock  *observedClock
+	mu     sync.Mutex
+	active bool
 }
 
 func (ticker *observedTicker) Stop() {
+	ticker.mu.Lock()
 	ticker.Ticker.Stop()
-	ticker.clock.report(Observation{Kind: KindTicker, Outcome: OutcomeStopped})
+	outcome := OutcomeInactive
+	if ticker.active {
+		ticker.active = false
+		outcome = OutcomeStopped
+	}
+	ticker.mu.Unlock()
+	ticker.clock.report(Observation{Kind: KindTicker, Outcome: outcome})
 }
 
 func (ticker *observedTicker) Reset(duration time.Duration) error {
+	ticker.mu.Lock()
 	err := ticker.Ticker.Reset(duration)
 	outcome := OutcomeReset
 	if err != nil {
 		outcome = OutcomeRejected
+	} else {
+		ticker.active = true
 	}
+	ticker.mu.Unlock()
 	ticker.clock.report(Observation{Kind: KindTicker, Outcome: outcome, Requested: duration})
 	return err
 }

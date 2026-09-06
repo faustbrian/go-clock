@@ -5,6 +5,20 @@ the module follows semantic versioning.
 
 ## [Unreleased]
 
+### Added
+
+- Add `manual.Clock.Close` as the immediate, synchronous, idempotent release
+  API while retaining `Shutdown` as a deprecated exact delegation.
+- Distinguish observed sleep deadline and non-cancellation failures with new
+  `deadline` and `failed` outcomes while preserving exact returned errors.
+
+### Fixed
+
+- Report only real active-to-stopped ticker transitions as stopped across
+  repeated and concurrent stops, and reactivate observation state after reset.
+- Make a closed manual clock reject every new sleep before context and duration
+  preconditions.
+
 ### Changed
 
 - Adopt the checksum-verified `go-library-tools` v1.4.0 CLI and immutable W14

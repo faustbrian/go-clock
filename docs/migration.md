@@ -23,7 +23,8 @@ subtraction with `Measure`; serialized timestamps are not elapsed marks.
 
 Ticker migrations must preserve drop/backpressure assumptions. Timer migrations
 must preserve stop/reset return handling. Callback migrations must assign an
-owner responsible for callback termination and clock shutdown.
+owner responsible for callback termination and clock closure. Existing
+`Shutdown` calls remain compatible, but new ownership code should call `Close`.
 
 Do not expose `FullClock` merely because it is convenient. Public interface
 widening makes later evolution harder and forces strict mocks to implement

@@ -132,6 +132,10 @@ const (
 	OutcomeCompleted Outcome = "completed"
 	// OutcomeCanceled reports context cancellation.
 	OutcomeCanceled Outcome = "canceled"
+	// OutcomeDeadline reports context deadline expiration.
+	OutcomeDeadline Outcome = "deadline"
+	// OutcomeFailed reports another synchronous operation failure.
+	OutcomeFailed Outcome = "failed"
 	// OutcomeStopped reports a successful active-to-stopped transition.
 	OutcomeStopped Outcome = "stopped"
 	// OutcomeInactive reports an operation on an inactive resource.
@@ -224,7 +228,7 @@ var (
 	ErrActiveLimit = errors.New("manual clock: active object limit exceeded")
 	// ErrWorkLimit reports exhaustion of one advancement's work budget.
 	ErrWorkLimit = errors.New("manual clock: advancement work limit exceeded")
-	// ErrClosed reports an operation attempted after shutdown.
+	// ErrClosed reports an operation attempted after the clock is closed.
 	ErrClosed = errors.New("manual clock: closed")
 	// ErrBackwardAdvance reports an AdvanceTo target before the current wall time.
 	ErrBackwardAdvance = errors.New("manual clock: backward advance")
@@ -269,6 +273,10 @@ func (clock *Clock) AfterFunc(duration time.Duration, function func()) (clockpkg
     AfterFunc schedules an owned callback. A panic is recovered and counted in
     the advancement Result; panic payloads are never retained.
 
+func (clock *Clock) Close() error
+    Close immediately and idempotently releases every active object owned by the
+    clock. It wakes active sleepers with ErrClosed and starts no goroutine.
+
 func (clock *Clock) Jump(delta time.Duration) error
     Jump changes wall time without changing monotonic progress or event
     deadlines.
@@ -291,7 +299,9 @@ func (clock *Clock) Now() time.Time
     Now returns the current wall time. The starting location is preserved.
 
 func (clock *Clock) Shutdown() error
-    Shutdown idempotently releases every active object owned by the clock.
+    Shutdown delegates to Close.
+
+    Deprecated: use Close.
 
 func (clock *Clock) Since(start time.Time) time.Duration
     Since returns wall-clock subtraction against Now. Use Mark and SinceMark for
