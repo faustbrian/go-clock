@@ -69,7 +69,8 @@ fmt.Println((<-timer.C()).Format(time.RFC3339))
 
 Events fire by deadline and then registration order. A ticker has a one-value
 buffer and drops backpressured ticks. Always stop resources that remain active,
-and call `Shutdown` when the manual clock's owner is done.
+and call `Close` when the manual clock's owner is done. `Shutdown` remains as a
+deprecated exact delegation for v1 compatibility.
 
 ### `testing/synctest`
 
@@ -113,6 +114,8 @@ that meets their contract.
   overflow, closure, and exhausted budgets return documented errors.
 - Observers receive bounded lifecycle metadata, never callback values, panic
   payloads, contexts, or timestamps.
+- Sleep observations distinguish completed, deadline, canceled, and other
+  failed outcomes while returning the exact base error.
 
 ## Documentation
 

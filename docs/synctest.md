@@ -31,7 +31,7 @@ manual advancement. Do not expect bubble fake time to advance a manual clock.
 | quiescence | `clocktest.Wait` / `synctest.Wait` | advancement `Waiter` |
 | wall jump or freeze | not injectable | `Jump` independent of `Advance` |
 | bubble isolation | timer/channel must stay in bubble | ordinary injected Go object |
-| shutdown ownership | caller stops each resource | `Shutdown` releases clock-owned work |
+| release ownership | caller stops each resource | `Close` releases clock-owned work |
 
 The test suite composes `System` sleep, timers, tickers, callbacks, elapsed
 measurement, and quiescence in bubbles. Manual lifecycle tests also run inside

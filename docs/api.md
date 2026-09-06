@@ -9,7 +9,8 @@ it is the correct choice across manual wall jumps.
 
 `Sleeper.Sleep` returns `nil` after the duration or `ctx.Err()` after
 cancellation. A non-positive duration completes immediately after checking the
-context.
+context. A closed manual clock returns `ErrClosed` before context or duration
+preconditions.
 
 Factories return owned resources and an error. Callers retain ownership until
 the resource fires or is stopped. A failed factory returns no resource.
@@ -33,6 +34,13 @@ ticks are dropped until that value is received.
 state. System callbacks use standard-library goroutines and panic behavior.
 Manual callbacks are coordinator-owned while running; their panics are counted
 without retaining values.
+
+## Release
+
+`manual.Clock.Close` is the immediate, synchronous, idempotent release
+operation. It rejects new timed work, wakes every active sleeper exactly once,
+stops scheduled objects, and creates no goroutine or drain obligation.
+`Shutdown` is deprecated and delegates directly to `Close`.
 
 ## Advancement and errors
 

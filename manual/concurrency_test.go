@@ -158,3 +158,55 @@ func TestCallbacksAndShutdownDoNotLeakGoroutines(t *testing.T) {
 		t.Fatalf("goroutines after shutdown = %d, baseline = %d", got, baseline)
 	}
 }
+
+func TestConcurrentCloseAndShutdownWakeEverySleeperOnce(t *testing.T) {
+	t.Parallel()
+
+	c, err := manual.New(time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const sleepers = 32
+	results := make(chan error, sleepers)
+	for range sleepers {
+		go func() { results <- c.Sleep(context.Background(), time.Hour) }()
+	}
+	deadline := time.Now().Add(time.Second)
+	for c.Snapshot().Active != sleepers {
+		if time.Now().After(deadline) {
+			t.Fatal("sleepers did not become active")
+		}
+		runtime.Gosched()
+	}
+	var releases sync.WaitGroup
+	releaseErrors := make(chan error, 32)
+	for index := range 32 {
+		releases.Go(func() {
+			if index%2 == 0 {
+				releaseErrors <- c.Close()
+				return
+			}
+			releaseErrors <- c.Shutdown()
+		})
+	}
+	releases.Wait()
+	close(releaseErrors)
+	for err := range releaseErrors {
+		if err != nil {
+			t.Fatalf("concurrent release error = %v", err)
+		}
+	}
+	for range sleepers {
+		if err := <-results; !errors.Is(err, manual.ErrClosed) {
+			t.Fatalf("Sleep() error = %v, want ErrClosed", err)
+		}
+	}
+	select {
+	case err := <-results:
+		t.Fatalf("sleeper returned more than once: %v", err)
+	default:
+	}
+	if snapshot := c.Snapshot(); !snapshot.Closed || snapshot.Active != 0 {
+		t.Fatalf("snapshot = %+v", snapshot)
+	}
+}

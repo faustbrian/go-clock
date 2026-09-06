@@ -16,7 +16,8 @@ tags, and concurrent lifecycle operations are caller-controlled inputs.
 - Wall rollback cannot reverse the manual monotonic counter.
 - Callback and observer panics do not corrupt manual clock state.
 - Observations bound tag cardinality/size and omit sensitive payloads.
-- Shutdown releases scheduled work and wakes owned waiters.
+- Close releases scheduled work and wakes owned waiters; deprecated `Shutdown`
+  delegates to the same operation.
 - Production code is scanned for `unsafe`, cgo, `go:linkname`, runtime patching,
   and global test-clock patterns.
 

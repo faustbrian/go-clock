@@ -11,8 +11,9 @@
 | advancing | nested/concurrent `Advance` | ordered bounded waiter | advancing |
 | advancing | all target work quiesces | exact results delivered | open |
 | advancing | work budget exhausted | all waiters fail predictably | open |
-| open or advancing | `Shutdown` | scheduled work and waiters released | closed |
-| closed | `Shutdown` | `nil` | closed |
+| open or advancing | `Close` | scheduled work and waiters released | closed |
+| closed | `Close` | `nil` | closed |
+| any | `Shutdown` | exact delegation to `Close` | closed |
 | closed | mutating operation | `ErrClosed` | closed |
 
 ## Manual timer
@@ -27,7 +28,7 @@
 | active | `Reset` | `true, nil` | active at new deadline |
 | fired, drained, or stopped | `Reset` | `false, nil`; old value drained | active at new deadline |
 | any | rejected `Reset` | error | prior state preserved |
-| active | `Shutdown` | no channel value | released |
+| active | `Close` | no channel value | released |
 | released | `Reset` | `false, ErrClosed` | released |
 
 ## Manual ticker
@@ -41,7 +42,7 @@
 | active or stopped | valid `Reset` | `nil` | active at new period |
 | any | invalid/rejected `Reset` | error | prior state preserved |
 | active | next-deadline overflow | current tick sent | released |
-| active | `Shutdown` | no further values | released |
+| active | `Close` | no further values | released |
 | released | `Reset` | `ErrClosed` | released |
 
 ## Manual callback
@@ -56,7 +57,7 @@
 | running, completed, panicked, or stopped | `Reset` | `false, nil` | active at new deadline |
 | running | callback returns | callback count recorded | completed |
 | running | callback panics | panic count recorded; payload discarded | panicked |
-| active | `Shutdown` | callback does not start | released |
+| active | `Close` | callback does not start | released |
 
 Resetting a running callback schedules a new invocation and does not wait for
 the running invocation, matching the standard callback-timer contract.
@@ -68,11 +69,11 @@ the running invocation, matching the standard callback-timer contract.
 | sleeper/created | positive `Sleep` | one owned schedule | active |
 | sleeper/active | due advancement | `nil` | completed |
 | sleeper/active | context done | `ctx.Err()` | canceled and released |
-| sleeper/active | `Shutdown` | `ErrClosed` | released |
+| sleeper/active | `Close` | `ErrClosed` | released |
 | advance/created | accepted `Advance` | owned waiter | active |
 | advance/active | target work quiesces | exact `Result` | completed |
 | advance/active | work limit | partial `Result`, `ErrWorkLimit` | failed and released |
-| advance/active | `Shutdown` | partial `Result`, `ErrClosed` | failed and released |
+| advance/active | `Close` | partial `Result`, `ErrClosed` | failed and released |
 | waiter/active | wait context done | `ctx.Err()` for that wait call | request remains active |
 
 ## System differential contract
@@ -99,6 +100,10 @@ started callback. A reset before start removes the prior heap entry before
 registering its replacement. Manual callback completion or panic is
 synchronized by advancement. Sleepers transition to completed, canceled, or
 closed exactly once.
+
+Observation wrappers track ticker lifecycle independently and race-free. One
+active-to-stopped transition emits `stopped`; later stops emit `inactive` until
+a successful reset reactivates the observed ticker.
 
 ## Ordering
 

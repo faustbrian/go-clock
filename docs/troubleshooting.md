@@ -2,7 +2,7 @@
 
 ## `ErrActiveLimit`
 
-Stop or let owned one-shot resources fire, call `Shutdown`, or construct the
+Stop or let owned one-shot resources fire, call `Close`, or construct the
 manual clock with an appropriate explicit limit. Repeated reset of an already
 active object does not consume another active slot.
 

@@ -3,6 +3,7 @@ package clock_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -11,6 +12,40 @@ import (
 	clock "github.com/faustbrian/go-clock"
 	"github.com/faustbrian/go-clock/manual"
 )
+
+type sleepErrorClock struct {
+	clock.System
+	err      error
+	returned bool
+}
+
+type identityError struct {
+	message string
+	cause   error
+}
+
+func (failure *identityError) Error() string { return failure.message }
+func (failure *identityError) Unwrap() error { return failure.cause }
+
+func (base *sleepErrorClock) Sleep(context.Context, time.Duration) error {
+	base.returned = true
+	return base.err
+}
+
+type callbackCaptureClock struct {
+	clock.System
+	function func()
+}
+
+func (base *callbackCaptureClock) AfterFunc(_ time.Duration, function func()) (clock.Callback, error) {
+	base.function = function
+	return callbackStub{}, nil
+}
+
+type callbackStub struct{}
+
+func (callbackStub) Stop() bool                        { return true }
+func (callbackStub) Reset(time.Duration) (bool, error) { return true, nil }
 
 func TestObservedClockReportsBoundedLifecycleData(t *testing.T) {
 	t.Parallel()
@@ -320,5 +355,226 @@ func TestObservedClockReportsFactoryAndResetErrors(t *testing.T) {
 	}
 	if rejected[clock.KindTimer] != 2 || rejected[clock.KindCallback] != 2 || rejected[clock.KindTicker] != 1 {
 		t.Fatalf("rejected observations = %v; all factory/reset errors must be classified", rejected)
+	}
+}
+
+func TestObservedSleepClassifiesExactReturnedError(t *testing.T) {
+	t.Parallel()
+
+	failed := &identityError{message: "sleep failed"}
+	deadline := &identityError{message: "sleep deadline", cause: context.DeadlineExceeded}
+	canceled := &identityError{message: "sleep canceled", cause: context.Canceled}
+	wrappedFailed := &identityError{message: "wrapped failure", cause: failed}
+	for _, test := range []struct {
+		name    string
+		err     error
+		exact   *identityError
+		outcome clock.Outcome
+	}{
+		{name: "completed", outcome: clock.OutcomeCompleted},
+		{name: "direct deadline", err: context.DeadlineExceeded, outcome: clock.OutcomeDeadline},
+		{name: "wrapped deadline", err: deadline, exact: deadline, outcome: clock.OutcomeDeadline},
+		{name: "canceled", err: canceled, exact: canceled, outcome: clock.OutcomeCanceled},
+		{name: "direct failure", err: failed, exact: failed, outcome: clock.OutcomeFailed},
+		{name: "wrapped failure", err: wrappedFailed, exact: wrappedFailed, outcome: clock.OutcomeFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var observations []clock.Observation
+			base := &sleepErrorClock{err: test.err}
+			observed, err := clock.Observe(base, clock.ObserverFunc(func(observation clock.Observation) {
+				if !base.returned {
+					t.Fatal("sleep observation emitted before base return")
+				}
+				observations = append(observations, observation)
+				panic("observer panic")
+			}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := observed.Sleep(context.Background(), time.Second)
+			if test.err == nil && got != nil {
+				t.Fatalf("Sleep() error = %v, want exact %v", got, test.err)
+			}
+			if test.exact != nil {
+				var gotExact *identityError
+				if reflect.TypeOf(got) != reflect.TypeOf(test.exact) ||
+					!errors.As(got, &gotExact) || gotExact != test.exact {
+					t.Fatalf("Sleep() error = %#v, want exact %#v", got, test.exact)
+				}
+			} else if test.err != nil && !errors.Is(got, test.err) {
+				t.Fatalf("Sleep() error = %v, want %v", got, test.err)
+			}
+			if len(observations) != 1 || observations[0].Kind != clock.KindSleep || observations[0].Outcome != test.outcome {
+				t.Fatalf("observations = %+v", observations)
+			}
+		})
+	}
+}
+
+func TestObservedCallbackStopLosingToStartReportsInactiveOnce(t *testing.T) {
+	t.Parallel()
+
+	base, err := manual.New(time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var terminal []clock.Outcome
+	observed, err := clock.Observe(base, clock.ObserverFunc(func(observation clock.Observation) {
+		if observation.Kind == clock.KindCallback && observation.Outcome != clock.OutcomeCreated {
+			mu.Lock()
+			terminal = append(terminal, observation.Outcome)
+			mu.Unlock()
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := make(chan struct{})
+	release := make(chan struct{})
+	callback, err := observed.AfterFunc(0, func() {
+		close(started)
+		<-release
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	type advanceResult struct {
+		waiter *manual.Waiter
+		err    error
+	}
+	advanced := make(chan advanceResult, 1)
+	go func() {
+		waiter, advanceErr := base.Advance(0)
+		advanced <- advanceResult{waiter: waiter, err: advanceErr}
+	}()
+	<-started
+	if callback.Stop() {
+		t.Fatal("Stop() prevented a callback that had already started")
+	}
+	close(release)
+	result := <-advanced
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	if _, err := result.waiter.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(terminal) != 2 || terminal[0] != clock.OutcomeInactive || terminal[1] != clock.OutcomeFired {
+		t.Fatalf("terminal outcomes = %v", terminal)
+	}
+}
+
+func TestObservedTickerReportsOnlyActiveStopTransitions(t *testing.T) {
+	t.Parallel()
+
+	base, err := manual.New(time.Unix(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var outcomes []clock.Outcome
+	observed, err := clock.Observe(base, clock.ObserverFunc(func(observation clock.Observation) {
+		if observation.Kind == clock.KindTicker && (observation.Outcome == clock.OutcomeStopped || observation.Outcome == clock.OutcomeInactive) {
+			mu.Lock()
+			outcomes = append(outcomes, observation.Outcome)
+			mu.Unlock()
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ticker, err := observed.NewTicker(time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var workers sync.WaitGroup
+	for range 32 {
+		workers.Go(ticker.Stop)
+	}
+	workers.Wait()
+	if err := ticker.Reset(0); !errors.Is(err, clock.ErrInvalidDuration) {
+		t.Fatalf("inactive Reset(0) error = %v", err)
+	}
+	ticker.Stop()
+	if err := ticker.Reset(time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if err := ticker.Reset(0); !errors.Is(err, clock.ErrInvalidDuration) {
+		t.Fatalf("active Reset(0) error = %v", err)
+	}
+	ticker.Stop()
+	ticker.Stop()
+
+	mu.Lock()
+	defer mu.Unlock()
+	stopped := 0
+	inactive := 0
+	for _, outcome := range outcomes {
+		if outcome == clock.OutcomeStopped {
+			stopped++
+		} else {
+			inactive++
+		}
+	}
+	if stopped != 2 || inactive != 33 {
+		t.Fatalf("stop outcomes = %v, want 2 stopped and 33 inactive", outcomes)
+	}
+}
+
+func TestObservedCallbackReportsTerminalOutcomeBeforeReturningOrRepanicking(t *testing.T) {
+	t.Parallel()
+
+	base := &callbackCaptureClock{}
+	var outcomes []clock.Outcome
+	observed, err := clock.Observe(base, clock.ObserverFunc(func(observation clock.Observation) {
+		if observation.Kind == clock.KindCallback && (observation.Outcome == clock.OutcomeFired || observation.Outcome == clock.OutcomePanicked) {
+			outcomes = append(outcomes, observation.Outcome)
+			if observation.Outcome == clock.OutcomePanicked {
+				panic("observer panic")
+			}
+		}
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	returned := false
+	_, err = observed.AfterFunc(0, func() {
+		if len(outcomes) != 0 {
+			t.Fatalf("terminal outcome emitted before callback return: %v", outcomes)
+		}
+		returned = true
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base.function()
+	if !returned || len(outcomes) != 1 || outcomes[0] != clock.OutcomeFired {
+		t.Fatalf("normal callback = (%v, %v)", returned, outcomes)
+	}
+
+	payload := &struct{ value string }{"exact payload"}
+	_, err = observed.AfterFunc(0, func() {
+		if len(outcomes) != 1 {
+			t.Fatalf("panic outcome emitted before callback panic: %v", outcomes)
+		}
+		panic(payload)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var recovered any
+	func() {
+		defer func() { recovered = recover() }()
+		base.function()
+	}()
+	if recovered != payload {
+		t.Fatalf("recovered payload = %#v, want exact %#v", recovered, payload)
+	}
+	if len(outcomes) != 2 || outcomes[1] != clock.OutcomePanicked {
+		t.Fatalf("panic outcomes = %v", outcomes)
 	}
 }

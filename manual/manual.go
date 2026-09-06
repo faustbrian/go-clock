@@ -15,7 +15,7 @@ var (
 	ErrActiveLimit = errors.New("manual clock: active object limit exceeded")
 	// ErrWorkLimit reports exhaustion of one advancement's work budget.
 	ErrWorkLimit = errors.New("manual clock: advancement work limit exceeded")
-	// ErrClosed reports an operation attempted after shutdown.
+	// ErrClosed reports an operation attempted after the clock is closed.
 	ErrClosed = errors.New("manual clock: closed")
 	// ErrBackwardAdvance reports an AdvanceTo target before the current wall time.
 	ErrBackwardAdvance = errors.New("manual clock: backward advance")
@@ -212,6 +212,12 @@ func (clock *Clock) AdvanceTo(target time.Time) (*Waiter, error) {
 
 // Sleep blocks until manual advancement reaches the deadline or ctx is done.
 func (clock *Clock) Sleep(ctx context.Context, duration time.Duration) error {
+	clock.mu.Lock()
+	if clock.closed {
+		clock.mu.Unlock()
+		return ErrClosed
+	}
+	clock.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -290,8 +296,9 @@ func (clock *Clock) Snapshot() Snapshot {
 	return Snapshot{Now: clock.wallAt(clock.elapsed), Elapsed: clock.elapsed, Active: clock.active, Closed: clock.closed}
 }
 
-// Shutdown idempotently releases every active object owned by the clock.
-func (clock *Clock) Shutdown() error {
+// Close immediately and idempotently releases every active object owned by
+// the clock. It wakes active sleepers with ErrClosed and starts no goroutine.
+func (clock *Clock) Close() error {
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
 	if clock.closed {
@@ -319,6 +326,13 @@ func (clock *Clock) Shutdown() error {
 	clock.active = 0
 	clock.signalLocked()
 	return nil
+}
+
+// Shutdown delegates to Close.
+//
+// Deprecated: use Close.
+func (clock *Clock) Shutdown() error {
+	return clock.Close()
 }
 
 // Result summarizes bounded work performed by one advancement.

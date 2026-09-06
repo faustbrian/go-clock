@@ -2,7 +2,7 @@
 
 `manual.Clock` protects state with one mutex and invokes neither callbacks nor
 observers while that mutex is held. Concurrent `Now`, mark measurement,
-factories, stop/reset, advancement, cancellation, jump, and shutdown are safe.
+factories, stop/reset, advancement, cancellation, jump, and close are safe.
 
 One advancement coordinator owns progress at a time. Concurrent and nested
 advances register requests with a target and waiter. The coordinator processes
@@ -30,6 +30,10 @@ cooperative callbacks are drained, and new nested advances fail immediately.
 Arbitrary user callbacks that never return cannot be forcibly stopped by Go;
 their termination remains callback-owner responsibility.
 
-`Shutdown` is idempotent, releases scheduled objects, wakes sleepers with
+`Close` is idempotent, releases scheduled objects, wakes sleepers with
 `ErrClosed`, and fails outstanding advancement waiters. It is safe from inside
-a callback.
+a callback. Deprecated `Shutdown` delegates directly to `Close`.
+
+Observed ticker stop/reset transition state has a separate wrapper mutex.
+Underlying lifecycle calls are serialized, but observer callbacks run after
+that mutex is released.
