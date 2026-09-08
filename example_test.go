@@ -40,6 +40,9 @@ func ExampleClock() {
 		panic(err)
 	}
 	fmt.Println((<-timer.C()).Format(time.RFC3339))
+	if err := manualClock.Close(); err != nil {
+		panic(err)
+	}
 	// Output: 2026-01-02T03:05:05Z
 }
 

@@ -31,11 +31,17 @@ the module follows semantic versioning.
 
 ### Documentation
 
+- Complete the stable-v1 package entry contract with exact Go support,
+  package and construction maps, actionable support and private vulnerability
+  routes, release-tag guidance, and complete reference navigation.
+- Make the public manual-clock quick start handle every error and release its
+  owned clock.
+
 - Link ecosystem guidance to the immutable v1.4.0 documentation release.
 - Replace archived monorepo and hardening terminology with package-owned
   documentation and reproducible verification guidance.
 
-## [1.0.0] - 2026-08-25
+## [1.0.0] - 2026-08-26
 
 ### Changed
 
@@ -90,7 +96,7 @@ The following initial scope is included in `v1.0.0`.
 #### Added
 
 - Narrow wall-time, elapsed-time, sleep, timer, ticker, and callback contracts.
-- Standard-library-backed `System` behavior for Go 1.26.
+- Standard-library-backed `System` behavior for Go 1.26.6.
 - Immutable fixed and bounded concurrency-safe manual clocks.
 - Deterministic advancement waiters, registration ordering, wall jumps,
   callback synchronization, panic containment, and shutdown.
