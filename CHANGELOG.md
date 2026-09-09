@@ -5,6 +5,8 @@ the module follows semantic versioning.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-09
+
 ### Added
 
 - Add `manual.Clock.Close` as the immediate, synchronous, idempotent release
@@ -105,5 +107,6 @@ The following initial scope is included in `v1.0.0`.
 - Race, fuzz, leak, mutation, benchmark, security, compatibility, and release
   automation.
 
-[Unreleased]: https://github.com/faustbrian/go-clock/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/faustbrian/go-clock/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/faustbrian/go-clock/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/faustbrian/go-clock/releases/tag/v1.0.0
