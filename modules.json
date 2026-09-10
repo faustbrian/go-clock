@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "repository": "github.com/faustbrian/go-clock",
-  "go_version": "1.26.6",
+  "go_version": "1.27.0",
   "modules": [
     {
       "directory": ".",
       "module_path": "github.com/faustbrian/go-clock",
-      "go_version": "1.26.6",
+      "go_version": "1.27.0",
       "packages": [
         {
           "module_directory": ".",
@@ -45,7 +45,7 @@
           "build_tags": []
         }
       ],
-      "purpose": "`clock` is a small, production-oriented clock foundation for Go 1.26.6 and later. It keeps `time.Time` and `time.Duration` as public values, separates wall time from elapsed time, and provides deterministic timers, tickers, sleeps, and callbacks without changing the process-wide clock.",
+      "purpose": "`clock` is a small, production-oriented clock foundation for Go 1.27.0 and later. It keeps `time.Time` and `time.Duration` as public values, separates wall time from elapsed time, and provides deterministic timers, tickers, sleeps, and callbacks without changing the process-wide clock.",
       "lifecycle": "stable",
       "kind": "public library",
       "releasable": true,
@@ -144,9 +144,9 @@
           "github.com/faustbrian/go-temporal"
         ],
         "supported_go": {
-          "minimum": "1.26.6",
+          "minimum": "1.27.0",
           "tested": [
-            "1.26.6"
+            "1.27.0"
           ]
         },
         "supported_platforms": [

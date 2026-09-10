@@ -7,10 +7,10 @@
 [![Documentation](https://img.shields.io/badge/docs-checked_in_CI-blue)](docs/)
 [![Go Reference](https://pkg.go.dev/badge/github.com/faustbrian/go-clock.svg)](https://pkg.go.dev/github.com/faustbrian/go-clock)
 [![Release](https://img.shields.io/github/v/release/faustbrian/go-clock?sort=semver)](https://github.com/faustbrian/go-clock/releases)
-[![Go](https://img.shields.io/badge/go-1.26.6-00ADD8?logo=go)](https://go.dev/)
+[![Go](https://img.shields.io/badge/go-1.27.0-00ADD8?logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-`clock` is a small, production-oriented clock foundation for Go 1.26.6 and
+`clock` is a small, production-oriented clock foundation for Go 1.27.0 and
 later. It keeps `time.Time` and `time.Duration` as public values, separates wall
 time from elapsed time, and provides deterministic timers, tickers, sleeps, and
 callbacks without changing the process-wide clock.
