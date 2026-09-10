@@ -1,7 +1,7 @@
 # Compatibility
 
 Version 1 requires Go 1.26.6 or newer. CI exercises Linux, macOS, and Windows
-with Go 1.26.6. The package uses only the standard library at runtime.
+with Go 1.27.0. The package uses only the standard library at runtime.
 
 Public API is tracked in `api/v1.txt`. Additive changes follow SemVer; removing
 or changing exported contracts requires a new major version. Standard-library
