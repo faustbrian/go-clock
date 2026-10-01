@@ -5,6 +5,8 @@ the module follows semantic versioning.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-01
+
 ### Changed
 
 - Raise the minimum supported and tested Go toolchain to 1.27.0.
@@ -111,6 +113,7 @@ The following initial scope is included in `v1.0.0`.
 - Race, fuzz, leak, mutation, benchmark, security, compatibility, and release
   automation.
 
-[Unreleased]: https://github.com/faustbrian/go-clock/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/faustbrian/go-clock/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/faustbrian/go-clock/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/faustbrian/go-clock/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/faustbrian/go-clock/releases/tag/v1.0.0
