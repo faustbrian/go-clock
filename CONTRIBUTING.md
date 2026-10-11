@@ -56,6 +56,12 @@ changes need relevant structure, links and examples, not unrelated runtime work.
 Public API, concurrency and external-boundary changes retain their affected
 compatibility, race or integration checks.
 
+Base-free `make check` and `make ci` execute saved fuzz seeds and the named
+checks, not active fuzz exploration. Ordinary CI uses its validated committed
+change range to select bounded active fuzz smoke. Documentation-only CI still
+checks changed content for secrets; missing change identities or scanner
+failures cannot produce a passing Required result.
+
 For active exploration, select one fuzz target and a small budget; long campaigns
 belong in scheduled assurance. Optional local mutation selects one package with
 a capable verifier. The commands below are examples, not all-change requirements.
