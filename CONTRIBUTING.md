@@ -34,7 +34,7 @@ prerequisite. Investigate viable survivors and add focused regressions for real
 defects; moving a campaign off PRs does not waive a confirmed correctness or
 security defect. Equivalent/invalid mutants retain reviewed narrow dispositions.
 
-Do not add package-local workflows, permanent replacements, machine-specific
+Do not fork shared verification workflows, add permanent replacements, machine-specific
 paths, bypass flags, broad mutation exclusions, or aggregate quality metrics
 that hide a failing package.
 
@@ -61,6 +61,15 @@ checks, not active fuzz exploration. Ordinary CI uses its validated committed
 change range to select bounded active fuzz smoke. Documentation-only CI still
 checks changed content for secrets; missing change identities or scanner
 failures cannot produce a passing Required result.
+
+The separate selected-assurance workflow runs on main every Monday at 03:41
+UTC. It rotates one declared `./manual` fuzz target for 30 seconds to explore
+lifecycle, duration and callback cancellation/work-limit risks. This is not
+the ordinary daily CI lane or a full stress/leak campaign. An explicit manual
+diagnostic on main requires an exact selector from `.golib.yaml`; empty or
+unknown selections fail. The immutable shared runner bounds workers, CPU,
+memory, output and private-cache lifetime; failures stay attributable and
+fatal. Full operations below remain explicit and unchanged.
 
 For active exploration, select one fuzz target and a small budget; long campaigns
 belong in scheduled assurance. Optional local mutation selects one package with
