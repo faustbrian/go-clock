@@ -23,6 +23,15 @@ api:
     - ./clocktest
 operations:
 - module: "."
+  gate: local-test
+  steps:
+  - type: go-test
+    packages: ["./manual"]
+    run: '^Test(ConcurrentAdvanceResetStopWaitCallbackCancelAndShutdown|ConcurrentCloseAndShutdownWakeEverySleeperOnce|CallbackCanReenterClockWithoutInternalLock|ShutdownReleasesOwnedWork)$'
+    race: true
+    count: 1
+    timeout: 2m
+- module: "."
   gate: test
   steps:
   - type: go-test
