@@ -1,7 +1,14 @@
 package clock // import "github.com/faustbrian/go-clock"
 
 Package clock provides narrow time capabilities backed by the standard library
-and deterministic implementations for tests.
+and deterministic implementations for tests. Accept the narrowest capability
+interface a consumer needs; System's zero value is the normal production
+implementation, while manual supplies explicit test-time control. Observe adds
+synchronous hooks without installing an exporter or registry.
+
+The package does not own calendars, cron scheduling, distributed ordering, or
+process-global time. All implementations use Go time values; no cgo or external
+service is required.
 
 Wall-clock timestamps and monotonic elapsed time are deliberately distinct.
 A time.Time returned by System.Now retains the process-local monotonic reading
@@ -24,7 +31,8 @@ var (
 	ErrInvalidDuration = errors.New("clock: invalid duration")
 	// ErrInvalidCallback reports a nil callback function.
 	ErrInvalidCallback = errors.New("clock: invalid callback")
-	// ErrOverflow reports a time operation outside time.Duration's range.
+	// ErrOverflow reports unrepresentable duration arithmetic or exhaustion of
+	// the manual clock's event registration sequence.
 	ErrOverflow = errors.New("clock: duration overflow")
 )
 var (
@@ -39,7 +47,11 @@ var (
 TYPES
 
 type Callback interface {
+	// Stop reports whether it prevented a scheduled invocation from starting.
+	// It does not wait for an invocation already running.
 	Stop() bool
+	// Reset reports prior scheduling activity and schedules another invocation.
+	// It does not wait for a running invocation, so calls can overlap.
 	Reset(time.Duration) (bool, error)
 }
     Callback is an owned timer callback.
@@ -48,22 +60,31 @@ type Callback interface {
     wait for an already-started callback to finish.
 
 type CallbackClock interface {
+	// AfterFunc schedules a non-nil function and transfers callback ownership.
+	// A nil function returns nil and ErrInvalidCallback; non-positive durations
+	// are immediately due. Panic and execution policy depend on the backend.
 	AfterFunc(time.Duration, func()) (Callback, error)
 }
     CallbackClock creates owned timer callbacks.
 
 type Clock interface {
+	// Now returns the implementation's current wall timestamp.
 	Now() time.Time
 }
     Clock obtains the current wall-clock time.
 
 type ElapsedClock interface {
+	// Since measures from start using the implementation's timestamp semantics.
+	// Manual clocks cannot recover elapsed progress from a wall timestamp.
 	Since(time.Time) time.Duration
+	// Measure captures elapsed progress and returns a reusable measurement.
+	// Fixed clocks always report zero; manual wall jumps do not affect it.
 	Measure() func() time.Duration
 }
-    ElapsedClock measures process-local elapsed time. Since accepts a time.Time
-    with standard-library monotonic semantics. Measure returns a closure tied to
-    the implementation's monotonic source and is the safe choice across explicit
+    ElapsedClock measures implementation-local elapsed time. Since accepts a
+    time.Time with time.Time.Sub semantics, including wall subtraction when no
+    compatible monotonic readings exist. Measure returns a closure tied to the
+    implementation's monotonic source and is the safe choice across explicit
     manual wall-clock jumps.
 
 type FullClock interface {
@@ -79,7 +100,20 @@ type FullClock interface {
 
 func Observe(base FullClock, observer Observer, options ...ObserveOption) (FullClock, error)
     Observe decorates a FullClock with bounded synchronous lifecycle hooks.
-    It starts no goroutine and owns no exporter or global registry.
+    It starts no goroutine and owns no exporter or global registry. The caller
+    still owns the base clock and its release; the wrapper does not expose
+    base-specific methods such as manual.Clock.Close.
+
+    Nil interfaces and a nil ObserverFunc are rejected; other typed-nil dynamic
+    values are not detected. Nil options are ignored. Clock validation failures
+    return nil with ErrInvalidClock, ErrInvalidObserver or the option's error.
+    Concurrent use requires a concurrency-safe base and observer.
+
+    Now, Since and Measure delegate without notifications. Timer/ticker channel
+    receives are not observed. Sleep reports after return without changing its
+    error; callbacks report after return or during panic unwinding and re-panic
+    the original value. Callback observations retain the initial duration and
+    measurement origin even after Reset; resets have their own observations.
 
 type Kind string
     Kind identifies an observed time resource.
@@ -95,32 +129,52 @@ const (
 	KindCallback Kind = "callback"
 )
 type Observation struct {
-	Kind      Kind
-	Outcome   Outcome
+	// Kind identifies the operation or resource being observed.
+	Kind Kind
+	// Outcome identifies the transition, completion or rejection.
+	Outcome Outcome
+	// Requested is the duration supplied to creation, sleep or reset.
+	// Stop observations have no requested duration and use zero.
 	Requested time.Duration
-	Elapsed   time.Duration
-	Tags      map[string]string
+	// Elapsed measures sleep or callback progress from the original call.
+	// Resource creation, stop and reset observations leave it zero.
+	Elapsed time.Duration
+	// Tags is a fresh map per observation, or nil when no tags are configured.
+	// The observer may retain or mutate it without affecting other observations.
+	Tags map[string]string
 }
-    Observation contains bounded lifecycle metadata. It never contains callback
-    functions, panic payloads, timestamps, contexts, or other sensitive values.
+    Observation contains bounded lifecycle metadata. Clock-generated metadata
+    excludes callback functions, panic payloads, timestamps and contexts.
+    Tag contents are caller-supplied and are not redacted; never attach secrets.
 
 type ObserveOption func(*observeConfig) error
     ObserveOption configures an observed clock.
 
 func WithTags(tags map[string]string) ObserveOption
-    WithTags attaches a bounded defensive copy of tags to every observation.
+    WithTags validates and copies tags when Observe applies the option,
+    then supplies a separate copy to each observation. Keys must be non-empty;
+    at most MaxObservationTags entries and MaxObservationTagBytes bytes per
+    key/value are accepted. Nil tags are valid. A later WithTags replaces an
+    earlier one. Do not mutate the input concurrently with construction or put
+    secrets in tags.
 
 type Observer interface {
+	// Observe consumes one observation and may retain its independently owned tags.
 	Observe(Observation)
 }
-    Observer consumes lifecycle metadata. Implementations must return promptly;
-    panics are isolated from clock behavior.
+    Observer consumes lifecycle metadata synchronously. Implementations
+    must return promptly and synchronize their own state: concurrent clock
+    operations and callbacks may call Observe concurrently. Calls happen outside
+    wrapper locks; reentrant observed operations produce nested notifications.
+    Panics are isolated, but blocking an observer blocks the corresponding clock
+    operation.
 
 type ObserverFunc func(Observation)
     ObserverFunc adapts a function to Observer.
 
 func (function ObserverFunc) Observe(observation Observation)
-    Observe calls function with observation.
+    Observe calls function with observation synchronously. A nil function panics
+    when called directly; the clock decorator recovers observer panics.
 
 type Outcome string
     Outcome identifies an observed lifecycle transition.
@@ -142,7 +196,7 @@ const (
 	OutcomeInactive Outcome = "inactive"
 	// OutcomeReset reports successful rescheduling.
 	OutcomeReset Outcome = "reset"
-	// OutcomeFired reports callback execution.
+	// OutcomeFired reports normal callback return.
 	OutcomeFired Outcome = "fired"
 	// OutcomePanicked reports a callback panic without its payload.
 	OutcomePanicked Outcome = "panicked"
@@ -150,6 +204,9 @@ const (
 	OutcomeRejected Outcome = "rejected"
 )
 type Sleeper interface {
+	// Sleep accepts a non-nil context and returns nil on completion or an error
+	// on cancellation or resource failure. Non-positive durations need no wait.
+	// Context cancellation does not stop other resources owned by the clock.
 	Sleep(context.Context, time.Duration) error
 }
     Sleeper waits for a duration or until its context is canceled.
@@ -160,17 +217,23 @@ type System struct{}
     Its zero value is ready for concurrent use and owns no background resources.
 
 func (System) AfterFunc(d time.Duration, fn func()) (Callback, error)
-    AfterFunc returns an owned wrapper around time.AfterFunc.
+    AfterFunc returns an owned wrapper around time.AfterFunc. A nil fn returns
+    nil and ErrInvalidCallback. The function runs in a standard-library
+    goroutine; its panic is not recovered. Stop/Reset do not wait for a running
+    function, and resetting a started callback can schedule an overlapping
+    invocation.
 
 func (System) Measure() func() time.Duration
     Measure captures the current standard-library monotonic reading and returns
     a closure that reports elapsed time from it.
 
 func (System) NewTicker(d time.Duration) (Ticker, error)
-    NewTicker returns an owned wrapper around time.NewTicker.
+    NewTicker returns an owned wrapper around time.NewTicker. A non-positive
+    period returns nil and ErrInvalidDuration instead of panicking.
 
 func (System) NewTimer(d time.Duration) (Timer, error)
-    NewTimer returns an owned wrapper around time.NewTimer.
+    NewTimer returns an owned wrapper around time.NewTimer and a nil error.
+    Non-positive durations are immediately due. Stop/Reset follow time.Timer.
 
 func (System) Now() time.Time
     Now returns time.Now without changing its location or monotonic reading.
@@ -182,11 +245,16 @@ func (System) Since(start time.Time) time.Duration
 func (System) Sleep(ctx context.Context, d time.Duration) error
     Sleep waits for d or context cancellation. Non-positive durations complete
     immediately unless the context is already canceled. Its timer is always
-    stopped on cancellation so the resource can be released promptly.
+    stopped on cancellation so the resource can be released promptly. A nil
+    context panics. If completion and cancellation race, either may win.
 
 type Ticker interface {
+	// C returns tick timestamps; slow receivers may miss ticks.
 	C() <-chan time.Time
+	// Stop idempotently prevents future ticks without closing C.
 	Stop()
+	// Reset starts a new period from the current instant. Non-positive periods
+	// return ErrInvalidDuration without changing the existing schedule.
 	Reset(time.Duration) error
 }
     Ticker is an owned periodic time event.
@@ -196,37 +264,55 @@ type Ticker interface {
     instead of exposing the standard library's panic across an interface seam.
 
 type TickerFactory interface {
+	// NewTicker requires a positive period and transfers ownership on success.
+	// Invalid periods return nil and ErrInvalidDuration.
 	NewTicker(time.Duration) (Ticker, error)
 }
     TickerFactory creates owned periodic tickers.
 
 type Timer interface {
+	// C returns the caller-owned receive side; callers must not close it.
 	C() <-chan time.Time
+	// Stop reports whether it stopped an active timer. It does not close C.
 	Stop() bool
+	// Reset reschedules from the current instant and reports prior activity.
+	// Non-positive durations are immediately due. Rejected manual resets leave
+	// the prior schedule/value intact; successful manual resets drain old values.
 	Reset(time.Duration) (bool, error)
 }
     Timer is an owned, one-shot time event.
 
-    Stop and Reset have the same return-value semantics as time.Timer. The owner
-    must stop a timer it no longer needs. As of Go 1.26, timer channels are
-    synchronous and an unbuffered receive after Stop reports true cannot observe
-    a stale value from the prior configuration.
+    The owner must stop a timer it no longer needs. System uses the synchronous
+    channel semantics of Go 1.23 and later; manual timers buffer one value and
+    retain an already-delivered value after Stop. Implementations document their
+    delivery and reset rules. A timer channel is not closed by Stop.
 
 type TimerFactory interface {
+	// NewTimer returns an owned timer, or nil and an error on failure.
+	// Non-positive durations are immediately due rather than invalid.
 	NewTimer(time.Duration) (Timer, error)
 }
     TimerFactory creates owned one-shot timers.
 
 package manual // import "github.com/faustbrian/go-clock/manual"
 
-Package manual provides deterministic fixed and manually advanced clocks.
+Package manual provides fixed timestamps and explicitly advanced test clocks.
+NewFixed is an immutable wall-time seam; New constructs a concurrency-safe
+Clock whose elapsed progress is independent of Jump's wall-time corrections.
+The package does not replace process time or automatically advance blocked
+goroutines, and it requires no cgo or external service.
+
+Clock owns bounded schedules and advancement waiters. Call Close to release
+scheduled work. Advancements may start callback goroutines and wait for them;
+callbacks must cooperate and use a nested advancement waiter to permit future
+progress. Closing the clock does not wait for running callbacks.
 
 VARIABLES
 
 var (
-	// ErrActiveLimit reports exhaustion of the configured active-object budget.
+	// ErrActiveLimit reports exhaustion of the scheduled-object or waiter budget.
 	ErrActiveLimit = errors.New("manual clock: active object limit exceeded")
-	// ErrWorkLimit reports exhaustion of one advancement's work budget.
+	// ErrWorkLimit reports exhaustion of a coordinator run's shared event budget.
 	ErrWorkLimit = errors.New("manual clock: advancement work limit exceeded")
 	// ErrClosed reports an operation attempted after the clock is closed.
 	ErrClosed = errors.New("manual clock: closed")
@@ -241,45 +327,94 @@ TYPES
 type Callback struct {
 	// Has unexported fields.
 }
-    Callback is a manually advanced timer callback.
+    Callback is a concurrency-safe scheduled function created by
+    Clock.AfterFunc. Its zero value is not usable. Clock advancement owns
+    started invocations; stopping or closing the clock cannot interrupt a
+    function already running.
 
 func (callback *Callback) Reset(duration time.Duration) (bool, error)
-    Reset reschedules the callback and reports whether it was active beforehand.
+    Reset reschedules the callback and reports prior scheduling activity,
+    not whether an invocation is running. Non-positive durations are immediately
+    due. A running invocation is not awaited; explicit reentrant/concurrent
+    progress may start an overlapping invocation. ErrClosed, ErrActiveLimit
+    when reactivating, and clock.ErrOverflow preserve the prior schedule on
+    rejection.
 
 func (callback *Callback) Stop() bool
-    Stop prevents an active callback from starting.
+    Stop prevents an active callback from starting and releases its schedule.
+    It returns false for an already-started or stopped invocation and does not
+    wait.
 
 type Clock struct {
 	// Has unexported fields.
 }
     Clock is a concurrency-safe deterministic clock. Time changes only through
-    Advance, AdvanceTo, or Jump. It starts no hidden goroutine.
+    Advance, AdvanceTo, or Jump. Construct it with New; the zero value is not a
+    usable clock. Do not copy a Clock after use.
+
+    State and resource Stop/Reset methods share one mutex. Reading time,
+    creating resources, advancing, jumping and closing may run concurrently.
+    Construction starts no goroutine; an advancement coordinator starts owned
+    callback goroutines outside the mutex. Callbacks must eventually return;
+    Close cannot terminate them. The caller owns Close and callback cooperation.
 
 func New(start time.Time, options ...Option) (*Clock, error)
     New constructs a clock at an explicit wall timestamp, including time.Time{}.
-    It preserves the location and strips any process-local monotonic reading so
-    Jump can model wall movement independently from elapsed progress.
+    It preserves the location and strips any process-local monotonic reading
+    so Jump can model wall movement independently from elapsed progress.
+    Nil options are ignored; an invalid option returns nil and its error.
+    Default limits are 65,536 scheduled objects, 65,536 waiters, and 1,000,000
+    fired events per coordinator run. The caller must Close the returned clock.
 
 func (clock *Clock) Advance(duration time.Duration) (*Waiter, error)
-    Advance moves monotonic time forward and synchronously processes every
-    event due through the target. Callbacks run outside internal locks in
-    deterministic timestamp and registration order.
+    Advance requests non-negative elapsed progress from the current instant.
+    The first request runs the coordinator synchronously; nested or concurrent
+    requests return a Waiter without starting another coordinator. Events become
+    due in deadline and registration order, with callbacks outside internal
+    locks.
+
+    Running callbacks freeze implicit future progress. Same-instant work may
+    run; a callback waiting for future work must submit a nested Advance and
+    call Wait to allow progress through its target. Arbitrary callbacks that
+    never return can block the coordinating Advance; Advance itself has no
+    cancellation input.
+
+    Invalid duration, closure, waiter limits and target overflow return no
+    waiter. Work-limit failure may return a non-nil waiter and ErrWorkLimit;
+    Wait then yields a partial Result. Already-started callbacks are drained
+    on that failure. Use the waiter to synchronize accepted work, including
+    reentrant requests.
 
 func (clock *Clock) AdvanceTo(target time.Time) (*Waiter, error)
-    AdvanceTo moves forward until target wall time. Backward wall movement must
-    use Jump so it cannot accidentally reverse monotonic progress.
+    AdvanceTo moves forward until target wall time. Backward wall movement
+    must use Jump so it cannot accidentally reverse monotonic progress. Targets
+    farther away than time.Duration can represent return clock.ErrOverflow.
+    Target conversion and request registration are separate operations;
+    a concurrent Advance or Jump can change the wall time between them.
 
 func (clock *Clock) AfterFunc(duration time.Duration, function func()) (clockpkg.Callback, error)
     AfterFunc schedules an owned callback. A panic is recovered and counted in
-    the advancement Result; panic payloads are never retained.
+    the advancement Result; panic payloads are never retained. A nil function
+    returns nil and clock.ErrInvalidCallback. Non-positive durations become
+    due at the current instant, but no callback starts until advancement.
+    Scheduling can return ErrClosed, ErrActiveLimit or clock.ErrOverflow.
+    Functions may reenter the clock, but must cooperate with advancement and
+    eventually return.
 
 func (clock *Clock) Close() error
-    Close immediately and idempotently releases every active object owned by the
-    clock. It wakes active sleepers with ErrClosed and starts no goroutine.
+    Close immediately and idempotently releases every active object owned by
+    the clock. It wakes active sleepers and fails pending advancement waiters
+    with ErrClosed, stops future scheduled events and starts no goroutine.
+    It always returns nil, including repeated calls. Existing timer/ticker
+    channels remain open and any buffered value remains readable. Read-only time
+    methods remain available. Running callbacks are neither stopped nor awaited;
+    an already-running Advance can still be blocked by them after Close returns.
 
 func (clock *Clock) Jump(delta time.Duration) error
     Jump changes wall time without changing monotonic progress or event
-    deadlines.
+    deadlines. Negative deltas are valid. ErrClosed and clock.ErrOverflow leave
+    the wall offset unchanged; overflow is checked against the accumulated jump
+    duration.
 
 func (clock *Clock) Mark() time.Duration
     Mark captures the current monotonic progress as a time.Duration token.
@@ -289,11 +424,18 @@ func (clock *Clock) Measure() func() time.Duration
     closure whose result is unaffected by Jump.
 
 func (clock *Clock) NewTicker(duration time.Duration) (clockpkg.Ticker, error)
-    NewTicker creates an owned ticker. Its one-element channel drops ticks while
-    the receiver is backpressured, matching the standard library policy.
+    NewTicker creates an owned ticker. Its one-element channel drops ticks
+    while the receiver is backpressured, matching the standard library policy.
+    A non-positive period returns nil and clock.ErrInvalidDuration. Scheduling
+    can also return ErrClosed, ErrActiveLimit or clock.ErrOverflow. The owner
+    must Stop the ticker; failure to compute its next deadline automatically
+    stops it.
 
 func (clock *Clock) NewTimer(duration time.Duration) (clockpkg.Timer, error)
-    NewTimer creates an owned one-shot timer.
+    NewTimer creates an owned one-shot timer with a one-value buffered channel.
+    Non-positive durations are due at the current instant but require
+    Advance to fire. Failure returns nil with ErrClosed, ErrActiveLimit or
+    clock.ErrOverflow; stopping an unused timer releases its schedule.
 
 func (clock *Clock) Now() time.Time
     Now returns the current wall time. The starting location is preserved.
@@ -305,13 +447,22 @@ func (clock *Clock) Shutdown() error
 
 func (clock *Clock) Since(start time.Time) time.Duration
     Since returns wall-clock subtraction against Now. Use Mark and SinceMark for
-    elapsed measurement that must remain correct across Jump.
+    elapsed measurement that must remain correct across Jump. The result may be
+    negative after a backward jump or when start is in the future.
 
 func (clock *Clock) SinceMark(mark time.Duration) time.Duration
     SinceMark returns monotonic progress since mark, independent of wall jumps.
+    Use a Mark from this clock; arbitrary tokens are not validated.
 
 func (clock *Clock) Sleep(ctx context.Context, duration time.Duration) error
     Sleep blocks until manual advancement reaches the deadline or ctx is done.
+    A nil context panics on an open clock. Closed clocks return ErrClosed before
+    checking context or duration. Otherwise a canceled context wins before
+    registration, and non-positive durations succeed without scheduling work.
+    Scheduling can fail with ErrClosed, ErrActiveLimit or clock.ErrOverflow.
+    Close wakes registered sleepers with ErrClosed; cancellation releases their
+    schedule. If completion, closure and cancellation race, either outcome may
+    win.
 
 func (clock *Clock) Snapshot() Snapshot
     Snapshot returns bounded diagnostic counters without callback payloads.
@@ -319,10 +470,12 @@ func (clock *Clock) Snapshot() Snapshot
 type Fixed struct {
 	// Has unexported fields.
 }
-    Fixed is an immutable wall clock.
+    Fixed is an immutable, concurrency-safe wall clock. Its zero value returns
+    time.Time{}; it has no scheduled resources or release obligation.
 
 func NewFixed(now time.Time) Fixed
-    NewFixed returns an immutable clock fixed at now.
+    NewFixed returns an immutable clock fixed at now, preserving its location
+    and any process-local monotonic reading. It accepts time.Time{}.
 
 func (Fixed) Measure() func() time.Duration
     Measure returns an elapsed measurement that remains zero for a fixed clock.
@@ -335,7 +488,11 @@ func (fixed Fixed) Since(start time.Time) time.Duration
     contain compatible monotonic readings, time.Time.Sub uses them.
 
 type Limits struct {
-	MaxActive         int
+	// MaxActive independently caps scheduled objects and outstanding waiters.
+	// Running callbacks have already left the scheduled-object count.
+	MaxActive int
+	// MaxWorkPerAdvance caps fired events in one coordinator run, including
+	// concurrent/nested requests and ticker ticks dropped by backpressure.
 	MaxWorkPerAdvance int
 }
     Limits bounds scheduled objects, outstanding advancement waiters, and work
@@ -347,69 +504,112 @@ type Option func(*config) error
 
 func WithLimits(limits Limits) Option
     WithLimits replaces the default active-object and advancement budgets.
+    Both fields must be positive or New returns nil and ErrInvalidLimits.
 
 type Result struct {
+	// StartedAt is elapsed progress when the request was registered.
 	StartedAt time.Duration
-	EndedAt   time.Duration
+	// EndedAt is the requested target on success or progress at failure.
+	EndedAt time.Duration
+	// Triggered counts fired events, including undelivered ticker ticks.
 	Triggered int
+	// Callbacks counts callback invocations started after submission.
 	Callbacks int
-	Panics    int
+	// Panics counts recovered callback panics recorded after submission.
+	Panics int
 }
-    Result summarizes bounded work performed by one advancement.
+    Result summarizes work relative to an advancement request's submission.
+    Concurrent/nested requests share a coordinator, so their counts can overlap.
+    A failed request reports partial work; its counts are captured when it
+    fails, not updated for callbacks that finish later during draining.
 
 type Snapshot struct {
-	Now     time.Time
+	// Now is the wall timestamp, including the accumulated jump offset.
+	Now time.Time
+	// Elapsed is manually advanced progress, unaffected by wall jumps.
 	Elapsed time.Duration
-	Active  int
-	Closed  bool
+	// Active counts scheduled objects, excluding running callbacks and waiters.
+	Active int
+	// Closed reports whether Close has released scheduled work.
+	Closed bool
 }
     Snapshot is a bounded view of manual-clock state.
 
 type Ticker struct {
 	// Has unexported fields.
 }
-    Ticker is a manually advanced periodic timer.
+    Ticker is a concurrency-safe manually advanced periodic timer created by
+    Clock.NewTicker. Its zero value is not usable; the owner must Stop it.
 
 func (ticker *Ticker) C() <-chan time.Time
-    C returns the ticker's receive-only event channel.
+    C returns the ticker's one-value buffered channel; undrained later ticks are
+    dropped. Stop and Clock.Close never close or drain it.
 
 func (ticker *Ticker) Reset(duration time.Duration) error
-    Reset changes the period and schedules the next tick from the current time.
+    Reset changes the period and schedules the next tick from current elapsed
+    progress without draining an old buffered tick. Non-positive periods return
+    clock.ErrInvalidDuration. ErrClosed, ErrActiveLimit when reactivating, and
+    clock.ErrOverflow also reject the reset without changing the prior schedule.
 
 func (ticker *Ticker) Stop()
-    Stop prevents future ticks. It is idempotent.
+    Stop prevents future ticks and releases its schedule. It is idempotent and
+    does not remove a timestamp already buffered in C.
 
 type Timer struct {
 	// Has unexported fields.
 }
-    Timer is a manually advanced one-shot timer.
+    Timer is a concurrency-safe manually advanced one-shot timer created by
+    Clock.NewTimer. Its zero value is not usable; the clock owns its schedule.
 
 func (timer *Timer) C() <-chan time.Time
-    C returns the timer's receive-only event channel.
+    C returns the timer's one-value buffered channel. It is never closed by Stop
+    or Clock.Close. A delivered timestamp includes the current wall offset.
 
 func (timer *Timer) Reset(duration time.Duration) (bool, error)
     Reset reschedules the timer and reports whether it was active beforehand.
+    Non-positive durations become due at the current instant. A successful
+    reset drains any old buffered timestamp; rejected resets preserve
+    schedule/value. Errors are ErrClosed, ErrActiveLimit when reactivating,
+    or clock.ErrOverflow.
 
 func (timer *Timer) Stop() bool
-    Stop prevents an active timer from firing.
+    Stop prevents an active timer from firing and releases its schedule.
+    It returns false after firing or a prior stop and does not drain a buffered
+    value.
 
 type Waiter struct {
 	// Has unexported fields.
 }
-    Waiter synchronizes completion of work triggered by an advancement.
+    Waiter synchronizes completion of work attributed to an advancement request.
+    Obtain it from Advance or AdvanceTo; its zero value is not usable. Wait may
+    be called concurrently or repeatedly. Context cancellation cancels only that
+    Wait call, not the underlying request or callbacks.
 
 func (waiter *Waiter) Wait(ctx context.Context) (Result, error)
-    Wait returns the completed result or context cancellation.
+    Wait returns the completed result, including partial work with ErrWorkLimit
+    or ErrClosed, or a zero Result with ctx.Err() if the pending wait is
+    canceled. An already-completed waiter returns its result even with a
+    canceled context. For a pending waiter, ctx must be non-nil. Waiting
+    explicitly permits future progress through this request's target while
+    callbacks are running.
 
 package clocktest // import "github.com/faustbrian/go-clock/clocktest"
 
-Package clocktest contains deterministic testing helpers for clock.
+Package clocktest bridges clock capabilities to testing/synctest and manual
+advancement. Start with SystemBubble when the whole test can use a synctest
+bubble, or Advance when explicit manual-clock progress is required.
+
+Helpers do not install a global clock or manage a manual clock's lifetime.
+Callers own manual clock release and callback cooperation. The package uses Go's
+testing facilities without external infrastructure or cgo.
 
 FUNCTIONS
 
 func Advance(t testing.TB, clock *manual.Clock, duration time.Duration) manual.Result
     Advance advances a manual clock, waits for all synchronously triggered work,
-    and fails the current test if either phase reports an error.
+    and fails the current test if either phase reports an error. The clock must
+    be non-nil. The wait uses t.Context(), but cancellation cannot interrupt an
+    Advance that is itself blocked by an uncooperative callback.
 
 func SystemBubble(t *testing.T, test func(*testing.T, clock.System))
     SystemBubble runs test in a testing/synctest bubble with a System clock.
@@ -419,4 +619,6 @@ func SystemBubble(t *testing.T, test func(*testing.T, clock.System))
 
 func Wait(ctx context.Context) error
     Wait checks ctx and then waits for every other goroutine in the current
-    synctest bubble to become durably blocked. It must be called from a bubble.
+    synctest bubble to become durably blocked. It must be called from a bubble
+    unless ctx is already canceled. A nil context panics. Cancellation is
+    checked before and after the wait; it does not interrupt synctest.Wait.

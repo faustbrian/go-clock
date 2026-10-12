@@ -34,7 +34,8 @@ One module: `github.com/faustbrian/go-clock`, Go 1.27.0, no dependencies.
 Three production-source package directories: `.`, `manual`, and `clocktest`.
 External test variants: `clock_test`, `manual_test`, and `clocktest_test`;
 manual also has white-box tests in package `manual`.
-No generated/vendor source, generators, cgo, build tags, or platform variants.
+No generated/vendor Go source, source generators, cgo, build tags, or platform
+variants. Generated API documentation is covered separately below.
 No specification-backed implementation claims or external conformance corpus.
 The sole debt/deprecation marker is the valid `Deprecated: use Close.` paragraph
 on `manual.Clock.Shutdown`; no TODO/FIXME/HACK/NOTE/WARNING remains.
@@ -99,3 +100,44 @@ The shared objective checker and CI adoption remain pending at the coordinator
 boundary; the disposable check is structural evidence, not hosted enforcement.
 Remote-main delivery, applicable hosted CI and aggregate goal status remain
 coordinator-owned and are not established by this local audit.
+
+## Generated API snapshot repair
+
+The initial source pass omitted regeneration of the existing `api/v1.txt`.
+[CI run 38273755984](https://github.com/faustbrian/go-clock/actions/runs/38273755984)
+on `28f4304f6a60a110b7f3a795db770fdc9253baa8` failed with
+`exported API documentation differs from api/v1.txt`: the snapshot still held
+pre-pass comments. Passing rendered-doc and AST checks did not establish the
+configured API gate. The repair owns only the generated snapshot and this audit;
+all Go source/comment bytes remain unchanged.
+
+The authoritative `.golib.yaml` baseline uses `mode: go-doc` and package order
+`.`, `./manual`, `./clocktest`. The module catalog pins Go 1.27.0. Native
+Tools `generateAPISnapshot` executes `go doc -all` for each package with
+`GOTOOLCHAIN=go1.27.0` and `GOWORK=off`, concatenates their complete raw outputs,
+then normalizes only the final trailing newlines to exactly one. No per-package
+trim, sorting or shortened declaration-only output is appropriate.
+
+Acceptance: generate those complete outputs twice with owned caches; reproduce
+the old snapshot mismatch, publish their normalized concatenation, require
+byte-identical repeated generation and unchanged extracted public declarations,
+and confirm every Go file remains byte-identical to the source-pass commit.
+Review the complete original-base-to-head documentation diff, scan changed
+content and record the narrow results. Earlier source/token/format/lint/docs
+proof remains attributed to its original execution; no broad runtime rerun.
+
+Repair verification passed with Go 1.27.0 and `GOWORK=off`: the old snapshot
+mismatch was reproduced, all three complete outputs were generated twice in
+configured order, and their normalized concatenations were byte-identical.
+The written `api/v1.txt` equals that repeated output and ends in exactly one
+newline. All 79 extracted public declaration blocks are unchanged after comment
+and whitespace removal. Every tracked Go source/test file remains byte-identical
+to `28f4304f6a60a110b7f3a795db770fdc9253baa8`.
+
+The ordinary complete original-base-to-head diff review includes the source
+comments and generated snapshot; no unresolved material finding remains.
+Changed-content secrets, local-link structure and `git diff --check` passed.
+Task-owned caches and generation outputs were removed. No source checks or
+runtime suites were reexecuted; earlier evidence remains attributed to its
+original source-pass execution. Current-head hosted CI and remote-main delivery
+remain coordinator-owned and unverified by this local repair.
