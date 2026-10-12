@@ -141,3 +141,10 @@ Task-owned caches and generation outputs were removed. No source checks or
 runtime suites were reexecuted; earlier evidence remains attributed to its
 original source-pass execution. Current-head hosted CI and remote-main delivery
 remain coordinator-owned and unverified by this local repair.
+
+## Objective enforcement adoption
+
+The local `source-docs-check` target is required by ordinary/full checks and CI.
+Shared CI uses `source_documentation: check` with the immutable Tools v2.4.0
+workflow and matching authenticated binary/checksum declaration. Structural
+checks do not replace this maintained semantic audit or native docs/examples.
