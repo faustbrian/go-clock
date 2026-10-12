@@ -1,4 +1,10 @@
-// Package clocktest contains deterministic testing helpers for clock.
+// Package clocktest bridges clock capabilities to testing/synctest and manual
+// advancement. Start with SystemBubble when the whole test can use a synctest
+// bubble, or Advance when explicit manual-clock progress is required.
+//
+// Helpers do not install a global clock or manage a manual clock's lifetime.
+// Callers own manual clock release and callback cooperation. The package uses
+// Go's testing facilities without external infrastructure or cgo.
 package clocktest
 
 import (
@@ -24,7 +30,9 @@ func SystemBubble(t *testing.T, test func(*testing.T, clock.System)) {
 }
 
 // Wait checks ctx and then waits for every other goroutine in the current
-// synctest bubble to become durably blocked. It must be called from a bubble.
+// synctest bubble to become durably blocked. It must be called from a bubble
+// unless ctx is already canceled. A nil context panics. Cancellation is checked
+// before and after the wait; it does not interrupt synctest.Wait.
 func Wait(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -34,7 +42,9 @@ func Wait(ctx context.Context) error {
 }
 
 // Advance advances a manual clock, waits for all synchronously triggered work,
-// and fails the current test if either phase reports an error.
+// and fails the current test if either phase reports an error. The clock must
+// be non-nil. The wait uses t.Context(), but cancellation cannot interrupt an
+// Advance that is itself blocked by an uncooperative callback.
 func Advance(t testing.TB, clock *manual.Clock, duration time.Duration) manual.Result {
 	t.Helper()
 	waiter, err := clock.Advance(duration)

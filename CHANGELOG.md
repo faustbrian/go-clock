@@ -5,6 +5,13 @@ the module follows semantic versioning.
 
 ## [Unreleased]
 
+### Documentation
+
+- Distinguish system and buffered manual timer semantics, and clarify manual
+  advancement, partial results, release and callback cooperation requirements.
+- Document observer concurrency, tag ownership and reset measurement origins,
+  along with package entry points, interface obligations and diagnostic fields.
+
 ## [1.2.0] - 2026-10-01
 
 ### Changed

@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	// ErrActiveLimit reports exhaustion of the configured active-object budget.
+	// ErrActiveLimit reports exhaustion of the scheduled-object or waiter budget.
 	ErrActiveLimit = errors.New("manual clock: active object limit exceeded")
-	// ErrWorkLimit reports exhaustion of one advancement's work budget.
+	// ErrWorkLimit reports exhaustion of a coordinator run's shared event budget.
 	ErrWorkLimit = errors.New("manual clock: advancement work limit exceeded")
 	// ErrClosed reports an operation attempted after the clock is closed.
 	ErrClosed = errors.New("manual clock: closed")
@@ -32,7 +32,11 @@ const (
 // processed by a Clock. MaxActive applies independently to scheduled objects
 // and advancement waiters.
 type Limits struct {
-	MaxActive         int
+	// MaxActive independently caps scheduled objects and outstanding waiters.
+	// Running callbacks have already left the scheduled-object count.
+	MaxActive int
+	// MaxWorkPerAdvance caps fired events in one coordinator run, including
+	// concurrent/nested requests and ticker ticks dropped by backpressure.
 	MaxWorkPerAdvance int
 }
 
@@ -43,7 +47,8 @@ type config struct {
 	limits Limits
 }
 
-// WithLimits replaces the default active-object and advancement budgets.
+// WithLimits replaces the default active-object and advancement budgets. Both
+// fields must be positive or New returns nil and ErrInvalidLimits.
 func WithLimits(limits Limits) Option {
 	return func(config *config) error {
 		if limits.MaxActive <= 0 || limits.MaxWorkPerAdvance <= 0 {
@@ -55,8 +60,17 @@ func WithLimits(limits Limits) Option {
 }
 
 // Clock is a concurrency-safe deterministic clock. Time changes only through
-// Advance, AdvanceTo, or Jump. It starts no hidden goroutine.
+// Advance, AdvanceTo, or Jump. Construct it with New; the zero value is not a
+// usable clock. Do not copy a Clock after use.
+//
+// State and resource Stop/Reset methods share one mutex. Reading time, creating
+// resources, advancing, jumping and closing may run concurrently. Construction
+// starts no goroutine; an advancement coordinator starts owned callback
+// goroutines outside the mutex. Callbacks must eventually return; Close cannot
+// terminate them. The caller owns Close and callback cooperation.
 type Clock struct {
+	// mu owns every schedule, request and progress transition. Callback user
+	// code runs only after unlocking; notify wakes the single coordinator.
 	mu               sync.Mutex
 	start            time.Time
 	elapsed          time.Duration
@@ -76,7 +90,10 @@ type Clock struct {
 
 // New constructs a clock at an explicit wall timestamp, including time.Time{}.
 // It preserves the location and strips any process-local monotonic reading so
-// Jump can model wall movement independently from elapsed progress.
+// Jump can model wall movement independently from elapsed progress. Nil options
+// are ignored; an invalid option returns nil and its error. Default limits are
+// 65,536 scheduled objects, 65,536 waiters, and 1,000,000 fired events per
+// coordinator run. The caller must Close the returned clock.
 func New(start time.Time, options ...Option) (*Clock, error) {
 	configuration := config{limits: Limits{
 		MaxActive:         defaultMaxActive,
@@ -101,7 +118,8 @@ func (clock *Clock) Now() time.Time {
 }
 
 // Since returns wall-clock subtraction against Now. Use Mark and SinceMark for
-// elapsed measurement that must remain correct across Jump.
+// elapsed measurement that must remain correct across Jump. The result may
+// be negative after a backward jump or when start is in the future.
 func (clock *Clock) Since(start time.Time) time.Duration {
 	return clock.Now().Sub(start)
 }
@@ -114,6 +132,7 @@ func (clock *Clock) Mark() time.Duration {
 }
 
 // SinceMark returns monotonic progress since mark, independent of wall jumps.
+// Use a Mark from this clock; arbitrary tokens are not validated.
 func (clock *Clock) SinceMark(mark time.Duration) time.Duration {
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
@@ -128,6 +147,8 @@ func (clock *Clock) Measure() func() time.Duration {
 }
 
 // Jump changes wall time without changing monotonic progress or event deadlines.
+// Negative deltas are valid. ErrClosed and clock.ErrOverflow leave the wall
+// offset unchanged; overflow is checked against the accumulated jump duration.
 func (clock *Clock) Jump(delta time.Duration) error {
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
@@ -142,9 +163,20 @@ func (clock *Clock) Jump(delta time.Duration) error {
 	return nil
 }
 
-// Advance moves monotonic time forward and synchronously processes every event
-// due through the target. Callbacks run outside internal locks in deterministic
-// timestamp and registration order.
+// Advance requests non-negative elapsed progress from the current instant.
+// The first request runs the coordinator synchronously; nested or concurrent
+// requests return a Waiter without starting another coordinator. Events become
+// due in deadline and registration order, with callbacks outside internal locks.
+//
+// Running callbacks freeze implicit future progress. Same-instant work may run;
+// a callback waiting for future work must submit a nested Advance and call Wait
+// to allow progress through its target. Arbitrary callbacks that never return
+// can block the coordinating Advance; Advance itself has no cancellation input.
+//
+// Invalid duration, closure, waiter limits and target overflow return no waiter.
+// Work-limit failure may return a non-nil waiter and ErrWorkLimit; Wait then
+// yields a partial Result. Already-started callbacks are drained on that failure.
+// Use the waiter to synchronize accepted work, including reentrant requests.
 func (clock *Clock) Advance(duration time.Duration) (*Waiter, error) {
 	if duration < 0 {
 		return nil, clockpkg.ErrInvalidDuration
@@ -197,7 +229,10 @@ func (clock *Clock) Advance(duration time.Duration) (*Waiter, error) {
 }
 
 // AdvanceTo moves forward until target wall time. Backward wall movement must
-// use Jump so it cannot accidentally reverse monotonic progress.
+// use Jump so it cannot accidentally reverse monotonic progress. Targets farther
+// away than time.Duration can represent return clock.ErrOverflow. Target
+// conversion and request registration are separate operations; a concurrent
+// Advance or Jump can change the wall time between them.
 func (clock *Clock) AdvanceTo(target time.Time) (*Waiter, error) {
 	now := clock.Now()
 	if target.Before(now) {
@@ -211,6 +246,12 @@ func (clock *Clock) AdvanceTo(target time.Time) (*Waiter, error) {
 }
 
 // Sleep blocks until manual advancement reaches the deadline or ctx is done.
+// A nil context panics on an open clock. Closed clocks return ErrClosed before
+// checking context or duration. Otherwise a canceled context wins before
+// registration, and non-positive durations succeed without scheduling work.
+// Scheduling can fail with ErrClosed, ErrActiveLimit or clock.ErrOverflow.
+// Close wakes registered sleepers with ErrClosed; cancellation releases their
+// schedule. If completion, closure and cancellation race, either outcome may win.
 func (clock *Clock) Sleep(ctx context.Context, duration time.Duration) error {
 	clock.mu.Lock()
 	if clock.closed {
@@ -248,7 +289,10 @@ func (clock *Clock) Sleep(ctx context.Context, duration time.Duration) error {
 	}
 }
 
-// NewTimer creates an owned one-shot timer.
+// NewTimer creates an owned one-shot timer with a one-value buffered channel.
+// Non-positive durations are due at the current instant but require Advance
+// to fire. Failure returns nil with ErrClosed, ErrActiveLimit or
+// clock.ErrOverflow; stopping an unused timer releases its schedule.
 func (clock *Clock) NewTimer(duration time.Duration) (clockpkg.Timer, error) {
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
@@ -260,7 +304,10 @@ func (clock *Clock) NewTimer(duration time.Duration) (clockpkg.Timer, error) {
 }
 
 // NewTicker creates an owned ticker. Its one-element channel drops ticks while
-// the receiver is backpressured, matching the standard library policy.
+// the receiver is backpressured, matching the standard library policy. A
+// non-positive period returns nil and clock.ErrInvalidDuration. Scheduling can
+// also return ErrClosed, ErrActiveLimit or clock.ErrOverflow. The owner must
+// Stop the ticker; failure to compute its next deadline automatically stops it.
 func (clock *Clock) NewTicker(duration time.Duration) (clockpkg.Ticker, error) {
 	if duration <= 0 {
 		return nil, clockpkg.ErrInvalidDuration
@@ -275,7 +322,11 @@ func (clock *Clock) NewTicker(duration time.Duration) (clockpkg.Ticker, error) {
 }
 
 // AfterFunc schedules an owned callback. A panic is recovered and counted in
-// the advancement Result; panic payloads are never retained.
+// the advancement Result; panic payloads are never retained. A nil function
+// returns nil and clock.ErrInvalidCallback. Non-positive durations become due
+// at the current instant, but no callback starts until advancement. Scheduling
+// can return ErrClosed, ErrActiveLimit or clock.ErrOverflow. Functions may
+// reenter the clock, but must cooperate with advancement and eventually return.
 func (clock *Clock) AfterFunc(duration time.Duration, function func()) (clockpkg.Callback, error) {
 	if function == nil {
 		return nil, clockpkg.ErrInvalidCallback
@@ -297,7 +348,12 @@ func (clock *Clock) Snapshot() Snapshot {
 }
 
 // Close immediately and idempotently releases every active object owned by
-// the clock. It wakes active sleepers with ErrClosed and starts no goroutine.
+// the clock. It wakes active sleepers and fails pending advancement waiters
+// with ErrClosed, stops future scheduled events and starts no goroutine. It
+// always returns nil, including repeated calls. Existing timer/ticker channels
+// remain open and any buffered value remains readable. Read-only time methods
+// remain available. Running callbacks are neither stopped nor awaited; an
+// already-running Advance can still be blocked by them after Close returns.
 func (clock *Clock) Close() error {
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
@@ -335,16 +391,27 @@ func (clock *Clock) Shutdown() error {
 	return clock.Close()
 }
 
-// Result summarizes bounded work performed by one advancement.
+// Result summarizes work relative to an advancement request's submission.
+// Concurrent/nested requests share a coordinator, so their counts can overlap.
+// A failed request reports partial work; its counts are captured when it fails,
+// not updated for callbacks that finish later during draining.
 type Result struct {
+	// StartedAt is elapsed progress when the request was registered.
 	StartedAt time.Duration
-	EndedAt   time.Duration
+	// EndedAt is the requested target on success or progress at failure.
+	EndedAt time.Duration
+	// Triggered counts fired events, including undelivered ticker ticks.
 	Triggered int
+	// Callbacks counts callback invocations started after submission.
 	Callbacks int
-	Panics    int
+	// Panics counts recovered callback panics recorded after submission.
+	Panics int
 }
 
-// Waiter synchronizes completion of work triggered by an advancement.
+// Waiter synchronizes completion of work attributed to an advancement request.
+// Obtain it from Advance or AdvanceTo; its zero value is not usable. Wait may
+// be called concurrently or repeatedly. Context cancellation cancels only that
+// Wait call, not the underlying request or callbacks.
 type Waiter struct {
 	clock   *Clock
 	done    chan struct{}
@@ -353,7 +420,11 @@ type Waiter struct {
 	err     error
 }
 
-// Wait returns the completed result or context cancellation.
+// Wait returns the completed result, including partial work with ErrWorkLimit
+// or ErrClosed, or a zero Result with ctx.Err() if the pending wait is canceled.
+// An already-completed waiter returns its result even with a canceled context.
+// For a pending waiter, ctx must be non-nil. Waiting explicitly permits future
+// progress through this request's target while callbacks are running.
 func (waiter *Waiter) Wait(ctx context.Context) (Result, error) {
 	select {
 	case <-waiter.done:
@@ -374,10 +445,14 @@ func (waiter *Waiter) Wait(ctx context.Context) (Result, error) {
 
 // Snapshot is a bounded view of manual-clock state.
 type Snapshot struct {
-	Now     time.Time
+	// Now is the wall timestamp, including the accumulated jump offset.
+	Now time.Time
+	// Elapsed is manually advanced progress, unaffected by wall jumps.
 	Elapsed time.Duration
-	Active  int
-	Closed  bool
+	// Active counts scheduled objects, excluding running callbacks and waiters.
+	Active int
+	// Closed reports whether Close has released scheduled work.
+	Closed bool
 }
 
 func newWaiter(clock *Clock) *Waiter {
@@ -390,6 +465,8 @@ func (clock *Clock) wallAt(elapsed time.Duration) time.Time {
 
 func addDuration(left, right time.Duration) (time.Duration, bool) {
 	sum := left + right
+	// Signed addition overflows only when equal-sign operands produce the
+	// opposite sign; checking the sum alone would reject valid negative jumps.
 	if ((left ^ sum) & (right ^ sum)) < 0 {
 		return 0, false
 	}
@@ -442,6 +519,9 @@ func (clock *Clock) runAdvancement() error {
 			maxTarget = max(maxTarget, request.target)
 		}
 		if hasActiveCallbacks(activeCallbacks) {
+			// A callback's resets must share a stable instant regardless of Go
+			// scheduling. Only an explicit waiter grants future progress; ordinary
+			// clock operations may wake same-instant work without advancing time.
 			allowedTarget := clock.elapsed
 			for _, request := range clock.requests {
 				if request.waiter.waiting {
@@ -587,6 +667,8 @@ func requestBlocked(
 	if request.target > elapsed || eventEligible(event, request.target) {
 		return true
 	}
+	// A nested request must not wait on the callback that submitted it, or
+	// reentrant Advance+Wait deadlocks. Later callbacks still belong to it.
 	for callbackID := range active {
 		if callbackID > request.baseCallbackID {
 			return true

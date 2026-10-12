@@ -58,7 +58,7 @@ const (
 	OutcomeInactive Outcome = "inactive"
 	// OutcomeReset reports successful rescheduling.
 	OutcomeReset Outcome = "reset"
-	// OutcomeFired reports callback execution.
+	// OutcomeFired reports normal callback return.
 	OutcomeFired Outcome = "fired"
 	// OutcomePanicked reports a callback panic without its payload.
 	OutcomePanicked Outcome = "panicked"
@@ -66,26 +66,40 @@ const (
 	OutcomeRejected Outcome = "rejected"
 )
 
-// Observation contains bounded lifecycle metadata. It never contains callback
-// functions, panic payloads, timestamps, contexts, or other sensitive values.
+// Observation contains bounded lifecycle metadata. Clock-generated metadata
+// excludes callback functions, panic payloads, timestamps and contexts. Tag
+// contents are caller-supplied and are not redacted; never attach secrets.
 type Observation struct {
-	Kind      Kind
-	Outcome   Outcome
+	// Kind identifies the operation or resource being observed.
+	Kind Kind
+	// Outcome identifies the transition, completion or rejection.
+	Outcome Outcome
+	// Requested is the duration supplied to creation, sleep or reset.
+	// Stop observations have no requested duration and use zero.
 	Requested time.Duration
-	Elapsed   time.Duration
-	Tags      map[string]string
+	// Elapsed measures sleep or callback progress from the original call.
+	// Resource creation, stop and reset observations leave it zero.
+	Elapsed time.Duration
+	// Tags is a fresh map per observation, or nil when no tags are configured.
+	// The observer may retain or mutate it without affecting other observations.
+	Tags map[string]string
 }
 
-// Observer consumes lifecycle metadata. Implementations must return promptly;
-// panics are isolated from clock behavior.
+// Observer consumes lifecycle metadata synchronously. Implementations must
+// return promptly and synchronize their own state: concurrent clock operations
+// and callbacks may call Observe concurrently. Calls happen outside wrapper
+// locks; reentrant observed operations produce nested notifications. Panics are
+// isolated, but blocking an observer blocks the corresponding clock operation.
 type Observer interface {
+	// Observe consumes one observation and may retain its independently owned tags.
 	Observe(Observation)
 }
 
 // ObserverFunc adapts a function to Observer.
 type ObserverFunc func(Observation)
 
-// Observe calls function with observation.
+// Observe calls function with observation synchronously. A nil function panics
+// when called directly; the clock decorator recovers observer panics.
 func (function ObserverFunc) Observe(observation Observation) {
 	function(observation)
 }
@@ -97,7 +111,11 @@ type observeConfig struct {
 	tags map[string]string
 }
 
-// WithTags attaches a bounded defensive copy of tags to every observation.
+// WithTags validates and copies tags when Observe applies the option, then
+// supplies a separate copy to each observation. Keys must be non-empty; at most
+// MaxObservationTags entries and MaxObservationTagBytes bytes per key/value are
+// accepted. Nil tags are valid. A later WithTags replaces an earlier one.
+// Do not mutate the input concurrently with construction or put secrets in tags.
 func WithTags(tags map[string]string) ObserveOption {
 	return func(config *observeConfig) error {
 		if len(tags) > MaxObservationTags {
@@ -115,7 +133,20 @@ func WithTags(tags map[string]string) ObserveOption {
 }
 
 // Observe decorates a FullClock with bounded synchronous lifecycle hooks. It
-// starts no goroutine and owns no exporter or global registry.
+// starts no goroutine and owns no exporter or global registry. The caller still
+// owns the base clock and its release; the wrapper does not expose base-specific
+// methods such as manual.Clock.Close.
+//
+// Nil interfaces and a nil ObserverFunc are rejected; other typed-nil dynamic
+// values are not detected. Nil options are ignored. Clock validation failures
+// return nil with ErrInvalidClock, ErrInvalidObserver or the option's error.
+// Concurrent use requires a concurrency-safe base and observer.
+//
+// Now, Since and Measure delegate without notifications. Timer/ticker channel
+// receives are not observed. Sleep reports after return without changing its
+// error; callbacks report after return or during panic unwinding and re-panic
+// the original value. Callback observations retain the initial duration and
+// measurement origin even after Reset; resets have their own observations.
 func Observe(base FullClock, observer Observer, options ...ObserveOption) (FullClock, error) {
 	if base == nil {
 		return nil, ErrInvalidClock
@@ -268,6 +299,8 @@ func (ticker *observedTicker) Stop() {
 		ticker.active = false
 		outcome = OutcomeStopped
 	}
+	// Release transition ownership before invoking caller code; reentrant
+	// observer operations must not deadlock on the lifecycle mutex.
 	ticker.mu.Unlock()
 	ticker.clock.report(Observation{Kind: KindTicker, Outcome: outcome})
 }

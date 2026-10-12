@@ -8,6 +8,8 @@ import (
 	clockpkg "github.com/faustbrian/go-clock"
 )
 
+// eventState is owned by Clock.mu; each active object has at most one heap
+// entry so reset/stop cannot retain obsolete callback captures.
 type eventState struct {
 	active bool
 	event  *scheduledEvent
@@ -24,6 +26,9 @@ type scheduledEvent struct {
 type eventHeap []*scheduledEvent
 
 func (events eventHeap) Len() int { return len(events) }
+
+// Deadlines use elapsed progress rather than wall time. Registration sequence
+// breaks ties, including new sequences assigned by resets.
 func (events eventHeap) Less(left, right int) bool {
 	if order := cmp.Compare(
 		events[left].deadline,
@@ -46,6 +51,7 @@ func (events *eventHeap) Push(value any) {
 func (events *eventHeap) Pop() any {
 	old := *events
 	last := old[len(old)-1]
+	// The backing array must not retain removed owners or callback captures.
 	old[len(old)-1] = nil
 	*events = old[:len(old)-1]
 	last.index = -1
@@ -86,6 +92,8 @@ func (clock *Clock) rescheduleLocked(state *eventState, duration time.Duration, 
 	return nil
 }
 
+// Replacement removes the indexed entry immediately; leaving stale entries
+// would let repeated resets grow the heap beyond the active-object budget.
 func (clock *Clock) replaceScheduledLocked(state *eventState, deadline time.Duration, owner any) {
 	clock.removeScheduledLocked(state)
 	clock.sequence++

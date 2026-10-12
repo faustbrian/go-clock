@@ -10,6 +10,9 @@ import (
 	"github.com/faustbrian/go-clock/manual"
 )
 
+// FuzzLifecycleSequences decodes at most 256 input bytes into bounded timer,
+// ticker, callback and advancement operations. It checks active-object bounds
+// after every operation and release after the sequence.
 func FuzzLifecycleSequences(f *testing.F) {
 	f.Add([]byte{0, 1, 2, 3, 4, 5, 6, 7})
 	f.Add([]byte{7, 7, 7, 0, 0, 1})
@@ -69,6 +72,9 @@ func FuzzLifecycleSequences(f *testing.F) {
 	})
 }
 
+// FuzzAdvanceDurations exercises the entire signed duration input domain with
+// no scheduled work: negative input must return no waiter and invalid-duration
+// error, while non-negative progress must produce a completed waiter.
 func FuzzAdvanceDurations(f *testing.F) {
 	f.Add(int64(0))
 	f.Add(int64(-1))
@@ -94,6 +100,9 @@ func FuzzAdvanceDurations(f *testing.F) {
 	})
 }
 
+// FuzzCallbackCancellationAndLimits reduces byte inputs to bounded callback
+// panic/fanout choices under small object/work budgets. It checks cancellation,
+// allowed work-limit failure, active accounting and final release.
 func FuzzCallbackCancellationAndLimits(f *testing.F) {
 	f.Add(byte(0), byte(0))
 	f.Add(byte(1), byte(8))

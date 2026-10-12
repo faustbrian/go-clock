@@ -13,6 +13,8 @@ import (
 	"github.com/faustbrian/go-clock/manual"
 )
 
+// sleepErrorClock makes the base error identity and notification-after-return
+// ordering observable without timing-dependent sleep failures.
 type sleepErrorClock struct {
 	clock.System
 	err      error
@@ -32,6 +34,8 @@ func (base *sleepErrorClock) Sleep(context.Context, time.Duration) error {
 	return base.err
 }
 
+// callbackCaptureClock lets the test invoke the decorated function on its own
+// stack so panic identity and terminal notification order can be inspected.
 type callbackCaptureClock struct {
 	clock.System
 	function func()

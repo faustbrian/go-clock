@@ -1172,6 +1172,8 @@ func advance(t *testing.T, c *manual.Clock, d time.Duration) manual.Result {
 	return result
 }
 
+// waitForActive is used inside a synctest bubble: quiescence establishes that
+// sleepers have registered before the test advances or releases their clock.
 func waitForActive(t *testing.T, c *manual.Clock, want int) {
 	t.Helper()
 	synctest.Wait()

@@ -1,14 +1,25 @@
-// Package manual provides deterministic fixed and manually advanced clocks.
+// Package manual provides fixed timestamps and explicitly advanced test clocks.
+// NewFixed is an immutable wall-time seam; New constructs a concurrency-safe
+// Clock whose elapsed progress is independent of Jump's wall-time corrections.
+// The package does not replace process time or automatically advance blocked
+// goroutines, and it requires no cgo or external service.
+//
+// Clock owns bounded schedules and advancement waiters. Call Close to release
+// scheduled work. Advancements may start callback goroutines and wait for them;
+// callbacks must cooperate and use a nested advancement waiter to permit future
+// progress. Closing the clock does not wait for running callbacks.
 package manual
 
 import "time"
 
-// Fixed is an immutable wall clock.
+// Fixed is an immutable, concurrency-safe wall clock. Its zero value returns
+// time.Time{}; it has no scheduled resources or release obligation.
 type Fixed struct {
 	now time.Time
 }
 
-// NewFixed returns an immutable clock fixed at now.
+// NewFixed returns an immutable clock fixed at now, preserving its location
+// and any process-local monotonic reading. It accepts time.Time{}.
 func NewFixed(now time.Time) Fixed {
 	return Fixed{now: now}
 }

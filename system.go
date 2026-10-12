@@ -30,7 +30,8 @@ func (System) Measure() func() time.Duration {
 
 // Sleep waits for d or context cancellation. Non-positive durations complete
 // immediately unless the context is already canceled. Its timer is always
-// stopped on cancellation so the resource can be released promptly.
+// stopped on cancellation so the resource can be released promptly. A nil
+// context panics. If completion and cancellation race, either may win.
 func (System) Sleep(ctx context.Context, d time.Duration) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -49,12 +50,14 @@ func (System) Sleep(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// NewTimer returns an owned wrapper around time.NewTimer.
+// NewTimer returns an owned wrapper around time.NewTimer and a nil error.
+// Non-positive durations are immediately due. Stop/Reset follow time.Timer.
 func (System) NewTimer(d time.Duration) (Timer, error) {
 	return systemTimer{timer: time.NewTimer(d)}, nil
 }
 
-// NewTicker returns an owned wrapper around time.NewTicker.
+// NewTicker returns an owned wrapper around time.NewTicker. A non-positive
+// period returns nil and ErrInvalidDuration instead of panicking.
 func (System) NewTicker(d time.Duration) (Ticker, error) {
 	if d <= 0 {
 		return nil, ErrInvalidDuration
@@ -62,7 +65,10 @@ func (System) NewTicker(d time.Duration) (Ticker, error) {
 	return systemTicker{ticker: time.NewTicker(d)}, nil
 }
 
-// AfterFunc returns an owned wrapper around time.AfterFunc.
+// AfterFunc returns an owned wrapper around time.AfterFunc. A nil fn returns
+// nil and ErrInvalidCallback. The function runs in a standard-library goroutine;
+// its panic is not recovered. Stop/Reset do not wait for a running function,
+// and resetting a started callback can schedule an overlapping invocation.
 func (System) AfterFunc(d time.Duration, fn func()) (Callback, error) {
 	if fn == nil {
 		return nil, ErrInvalidCallback

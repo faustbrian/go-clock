@@ -5,6 +5,9 @@ import (
 	"time"
 )
 
+// TestMutationContractsForAdvancementPredicates covers helper truth-table edges
+// directly, especially inclusive deadlines and callbacks newer than a request.
+// Public advancement behavior is exercised separately in manual_test.go.
 func TestMutationContractsForAdvancementPredicates(t *testing.T) {
 	request := &advanceRequest{
 		target:         2,

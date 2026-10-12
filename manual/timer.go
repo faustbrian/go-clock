@@ -6,17 +6,20 @@ import (
 	clockpkg "github.com/faustbrian/go-clock"
 )
 
-// Timer is a manually advanced one-shot timer.
+// Timer is a concurrency-safe manually advanced one-shot timer created by
+// Clock.NewTimer. Its zero value is not usable; the clock owns its schedule.
 type Timer struct {
 	clock   *Clock
 	state   eventState
 	channel chan time.Time
 }
 
-// C returns the timer's receive-only event channel.
+// C returns the timer's one-value buffered channel. It is never closed by
+// Stop or Clock.Close. A delivered timestamp includes the current wall offset.
 func (timer *Timer) C() <-chan time.Time { return timer.channel }
 
-// Stop prevents an active timer from firing.
+// Stop prevents an active timer from firing and releases its schedule. It
+// returns false after firing or a prior stop and does not drain a buffered value.
 func (timer *Timer) Stop() bool {
 	timer.clock.mu.Lock()
 	defer timer.clock.mu.Unlock()
@@ -30,6 +33,9 @@ func (timer *Timer) Stop() bool {
 }
 
 // Reset reschedules the timer and reports whether it was active beforehand.
+// Non-positive durations become due at the current instant. A successful reset
+// drains any old buffered timestamp; rejected resets preserve schedule/value.
+// Errors are ErrClosed, ErrActiveLimit when reactivating, or clock.ErrOverflow.
 func (timer *Timer) Reset(duration time.Duration) (bool, error) {
 	timer.clock.mu.Lock()
 	defer timer.clock.mu.Unlock()
@@ -60,7 +66,8 @@ func (timer *Timer) Reset(duration time.Duration) (bool, error) {
 	return wasActive, nil
 }
 
-// Ticker is a manually advanced periodic timer.
+// Ticker is a concurrency-safe manually advanced periodic timer created by
+// Clock.NewTicker. Its zero value is not usable; the owner must Stop it.
 type Ticker struct {
 	clock    *Clock
 	state    eventState
@@ -68,10 +75,12 @@ type Ticker struct {
 	interval time.Duration
 }
 
-// C returns the ticker's receive-only event channel.
+// C returns the ticker's one-value buffered channel; undrained later ticks are
+// dropped. Stop and Clock.Close never close or drain it.
 func (ticker *Ticker) C() <-chan time.Time { return ticker.channel }
 
-// Stop prevents future ticks. It is idempotent.
+// Stop prevents future ticks and releases its schedule. It is idempotent and
+// does not remove a timestamp already buffered in C.
 func (ticker *Ticker) Stop() {
 	ticker.clock.mu.Lock()
 	defer ticker.clock.mu.Unlock()
@@ -82,7 +91,10 @@ func (ticker *Ticker) Stop() {
 	}
 }
 
-// Reset changes the period and schedules the next tick from the current time.
+// Reset changes the period and schedules the next tick from current elapsed
+// progress without draining an old buffered tick. Non-positive periods return
+// clock.ErrInvalidDuration. ErrClosed, ErrActiveLimit when reactivating, and
+// clock.ErrOverflow also reject the reset without changing the prior schedule.
 func (ticker *Ticker) Reset(duration time.Duration) error {
 	if duration <= 0 {
 		return clockpkg.ErrInvalidDuration
@@ -111,14 +123,17 @@ func (ticker *Ticker) Reset(duration time.Duration) error {
 	return nil
 }
 
-// Callback is a manually advanced timer callback.
+// Callback is a concurrency-safe scheduled function created by Clock.AfterFunc.
+// Its zero value is not usable. Clock advancement owns started invocations;
+// stopping or closing the clock cannot interrupt a function already running.
 type Callback struct {
 	clock    *Clock
 	state    eventState
 	function func()
 }
 
-// Stop prevents an active callback from starting.
+// Stop prevents an active callback from starting and releases its schedule. It
+// returns false for an already-started or stopped invocation and does not wait.
 func (callback *Callback) Stop() bool {
 	callback.clock.mu.Lock()
 	defer callback.clock.mu.Unlock()
@@ -131,7 +146,11 @@ func (callback *Callback) Stop() bool {
 	return true
 }
 
-// Reset reschedules the callback and reports whether it was active beforehand.
+// Reset reschedules the callback and reports prior scheduling activity, not
+// whether an invocation is running. Non-positive durations are immediately due.
+// A running invocation is not awaited; explicit reentrant/concurrent progress
+// may start an overlapping invocation. ErrClosed, ErrActiveLimit when
+// reactivating, and clock.ErrOverflow preserve the prior schedule on rejection.
 func (callback *Callback) Reset(duration time.Duration) (bool, error) {
 	callback.clock.mu.Lock()
 	defer callback.clock.mu.Unlock()
