@@ -1,5 +1,7 @@
 # FAQ
 
+[Documentation index](README.md)
+
 ## Why not use `time` directly?
 
 Do so when it is sufficient. A clock seam is useful only for explicit business
@@ -30,3 +32,5 @@ whole-test fake-time progression.
 
 No. They are synchronous, panic-isolated, and expected to return promptly. The
 package intentionally owns no exporter or hidden telemetry goroutine.
+
+Continue with [API and ownership](api.md).

@@ -1,5 +1,7 @@
 # Wall time and monotonic time
 
+[Documentation index](README.md)
+
 Wall time answers “what timestamp is it?” and can jump because of NTP, operator
 changes, suspend/resume behavior, or test scenarios. Elapsed time answers “how
 long did this take?” and must not silently depend on rollback-prone civil time.
@@ -31,3 +33,5 @@ monotonic advancement.
 Clock agreement across processes is not a correctness primitive. Leases,
 fencing tokens, versions, and idempotency keys belong in distributed protocol
 packages such as `lease`.
+
+Continue with [API and ownership](api.md).

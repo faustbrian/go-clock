@@ -1,5 +1,7 @@
 # Package integration
 
+[Documentation index](README.md)
+
 Adopt incrementally and preserve existing public constructors until a planned
 major release. Add an internal constructor or option that accepts the narrowest
 capability, then make the old constructor supply `clock.System{}`.
@@ -32,3 +34,5 @@ replacement. The adoption sequence for the remaining owned libraries is:
 
 `calendar` continues to own civil arithmetic, `temporal` interval
 algebra, `scheduler` scheduling, and `lease` distributed fencing.
+
+Continue with [API and ownership](api.md).

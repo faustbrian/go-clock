@@ -1,5 +1,7 @@
 # State machines and ordering
 
+[Documentation index](README.md)
+
 ## Manual clock
 
 | State | Operation | Result | Next state |
@@ -121,3 +123,5 @@ stable instant rather than goroutine scheduling.
 Ticker backpressure changes delivery, not deadline progression. An advance from
 zero through three one-second periods processes deadlines 1s, 2s, and 3s, but a
 receiver that never drains observes only the first buffered timestamp.
+
+Continue with [API and ownership](api.md).

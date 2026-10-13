@@ -1,5 +1,7 @@
 # Verification
 
+[Documentation index](README.md)
+
 Install the `golib` release declared by `.golib.yaml`, then run:
 
 ```sh

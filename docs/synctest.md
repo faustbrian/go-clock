@@ -1,5 +1,7 @@
 # `testing/synctest` interoperability
 
+[Documentation index](README.md)
+
 Go 1.26's `testing/synctest` is preferred when all relevant goroutines and
 standard-library timers fit inside one bubble. Fake time advances when bubble
 goroutines are durably blocked, and `synctest.Wait` provides the standard
@@ -37,3 +39,5 @@ The test suite composes `System` sleep, timers, tickers, callbacks, elapsed
 measurement, and quiescence in bubbles. Manual lifecycle tests also run inside
 bubbles where synctest is useful for goroutine startup, while retaining
 explicit advancement as the only manual-time authority.
+
+Continue with [API and ownership](api.md).

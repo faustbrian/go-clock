@@ -1,5 +1,7 @@
 # Performance
 
+[Documentation index](README.md)
+
 `System.Now` and an established `System.Measure` closure allocate zero bytes in
 the maintained baseline. Manual scheduling uses a binary heap: create, reset,
 and stop are `O(log n)`, and advancement is
@@ -38,3 +40,5 @@ go test -run '^$' \
 Ticker advancement processes each logical deadline so ordering, work budgets,
 and backpressure remain explicit. Large periods or fan-out should use limits
 that reflect the owning test or application.
+
+Continue with [API and ownership](api.md).

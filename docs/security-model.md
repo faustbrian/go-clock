@@ -1,5 +1,7 @@
 # Security model
 
+[Documentation index](README.md)
+
 Version: 1.0
 
 ## Assets and trust boundaries
@@ -36,3 +38,5 @@ request and memory limits.
 | Default active-object and work budgets may be too large for an untrusted schedule. | Application integrator; one package-wide default cannot represent every request and memory budget. | Configure lower `MaxActive` and `MaxWorkPerAdvance` values at the trust boundary. | Revisit if scheduling becomes reachable from untrusted input without caller configuration. |
 | Caller-provided observation tags can contain sensitive or high-cardinality values despite size limits. | Application integrator; the package cannot classify caller-supplied tag meaning. | Use bounded, nonsensitive classifications rather than user, request, token, or payload values. | Revisit if tags are generated or exported by the package. |
 | A process-local clock cannot establish trustworthy distributed ordering. | Distributed-system integrator; wall time is not a cross-process authority. | Use fencing and version protocols for cross-process decisions. | Revisit if the package adds distributed coordination or persistence. |
+
+Continue with [Verification](verification.md).

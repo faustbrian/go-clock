@@ -1,5 +1,7 @@
 # Observations
 
+[Documentation index](README.md)
+
 `Observe` wraps a `FullClock` without a global registry, exporter, or background
 goroutine. The observer is called synchronously after lifecycle transitions and
 must return promptly. Observer panics are recovered and cannot corrupt clock
@@ -28,3 +30,5 @@ Ticker stop observations are transition-based: the first active stop is
 reactivates the transition. Callback observations are `fired` only after normal
 return and `panicked` while unwinding before the original panic payload is
 re-panicked. Observer panics remain isolated on both paths.
+
+Continue with [API and ownership](api.md).

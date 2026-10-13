@@ -1,5 +1,7 @@
 # Migration guide
 
+[Documentation index](README.md)
+
 Given a package-local interface:
 
 ```go
@@ -29,3 +31,5 @@ owner responsible for callback termination and clock closure. Existing
 Do not expose `FullClock` merely because it is convenient. Public interface
 widening makes later evolution harder and forces strict mocks to implement
 unrelated capabilities.
+
+Continue with [API and ownership](api.md).

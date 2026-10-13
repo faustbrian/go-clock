@@ -1,5 +1,7 @@
 # Deterministic concurrency
 
+[Documentation index](README.md)
+
 `manual.Clock` protects state with one mutex and invokes neither callbacks nor
 observers while that mutex is held. Concurrent `Now`, mark measurement,
 factories, stop/reset, advancement, cancellation, jump, and close are safe.
@@ -37,3 +39,5 @@ a callback. Deprecated `Shutdown` delegates directly to `Close`.
 Observed ticker stop/reset transition state has a separate wrapper mutex.
 Underlying lifecycle calls are serialized, but observer callbacks run after
 that mutex is released.
+
+Continue with [API and ownership](api.md).

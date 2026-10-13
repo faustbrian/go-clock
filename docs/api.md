@@ -1,5 +1,7 @@
 # API and ownership
 
+[Documentation index](README.md)
+
 ## Root capabilities
 
 `Clock.Now` returns wall time. `ElapsedClock.Since` follows `time.Since` style

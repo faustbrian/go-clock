@@ -1,5 +1,7 @@
 # Compatibility
 
+[Documentation index](README.md)
+
 Version 1.2 requires Go 1.27.0 or newer. CI exercises Linux with Go 1.27.0.
 The package uses only the standard library at runtime.
 
@@ -15,3 +17,5 @@ factory interfaces, plus context-aware timer cleanup for sleep.
 Manual channels are buffered by one value to make deterministic advancement
 independent of receiver scheduling. This is an explicit fake-clock contract,
 not a claim that it reproduces every internal implementation detail of `time`.
+
+Continue with [API and ownership](api.md).

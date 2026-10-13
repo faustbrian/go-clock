@@ -1,5 +1,7 @@
 # Troubleshooting
 
+[Documentation index](README.md)
+
 ## `ErrActiveLimit`
 
 Stop or let owned one-shot resources fire, call `Close`, or construct the
@@ -33,3 +35,5 @@ buffer. System behavior follows Go 1.26 timer channel guarantees.
 
 Create channels, timers, tickers, and goroutines inside the same bubble. Do not
 operate on bubbled resources from an external goroutine.
+
+Continue with [API and ownership](api.md).
